@@ -25,7 +25,7 @@ from utilities.string import trailing_slash
 # Environment setup
 #
 
-VERSION = '4.0.8-dev'
+VERSION = '4.0.9-dev'
 HOSTNAME = platform.node()
 # Set the base directory two levels up
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -739,11 +739,16 @@ RQ_QUEUES.update({
 
 # Supported translation languages
 LANGUAGES = (
+    ('cs', _('Czech')),
+    ('da', _('Danish')),
     ('de', _('German')),
     ('en', _('English')),
     ('es', _('Spanish')),
     ('fr', _('French')),
+    ('it', _('Italian')),
     ('ja', _('Japanese')),
+    ('nl', _('Dutch')),
+    ('pl', _('Polish')),
     ('pt', _('Portuguese')),
     ('ru', _('Russian')),
     ('tr', _('Turkish')),
