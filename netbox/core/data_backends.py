@@ -2,6 +2,9 @@ import logging
 import os
 import re
 import tempfile
+import jwt
+import time
+import requests
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,6 +22,7 @@ from .exceptions import SyncError
 
 __all__ = (
     'GitBackend',
+    'GitHubJWTBackend',
     'LocalBackend',
     'S3Backend',
 )
@@ -40,30 +44,7 @@ class LocalBackend(DataBackend):
         yield local_path
 
 
-@register_data_backend()
-class GitBackend(DataBackend):
-    name = 'git'
-    label = 'Git'
-    parameters = {
-        'username': forms.CharField(
-            required=False,
-            label=_('Username'),
-            widget=forms.TextInput(attrs={'class': 'form-control'}),
-            help_text=_("Only used for cloning with HTTP(S)"),
-        ),
-        'password': forms.CharField(
-            required=False,
-            label=_('Password'),
-            widget=forms.TextInput(attrs={'class': 'form-control'}),
-            help_text=_("Only used for cloning with HTTP(S)"),
-        ),
-        'branch': forms.CharField(
-            required=False,
-            label=_('Branch'),
-            widget=forms.TextInput(attrs={'class': 'form-control'})
-        )
-    }
-    sensitive_parameters = ['password']
+class GitBase(DataBackend):
 
     def init_config(self):
         from dulwich.config import ConfigDict
@@ -102,11 +83,12 @@ class GitBackend(DataBackend):
             clone_args['pool_manager'] = ProxyPoolManager(self.socks_proxy)
 
         if self.url_scheme in ('http', 'https'):
-            if self.params.get('username'):
+            username, password = self._build_auth()
+            if username:
                 clone_args.update(
                     {
-                        "username": self.params.get('username'),
-                        "password": self.params.get('password'),
+                        "username": username,
+                        "password": password,
                     }
                 )
         if self.url_scheme:
@@ -122,6 +104,107 @@ class GitBackend(DataBackend):
         yield local_path.name
 
         local_path.cleanup()
+
+    def _build_auth(self):
+        """ Not Implemented in base class """
+        return None, None
+
+
+@register_data_backend()
+class GitBackend(GitBase):
+    name = 'git'
+    label = 'Git'
+    parameters = {
+        'username': forms.CharField(
+            required=False,
+            label=_('Username'),
+            widget=forms.TextInput(attrs={'class': 'form-control'}),
+            help_text=_("Only used for cloning with HTTP(S)"),
+        ),
+        'password': forms.CharField(
+            required=False,
+            label=_('Password'),
+            widget=forms.TextInput(attrs={'class': 'form-control'}),
+            help_text=_("Only used for cloning with HTTP(S)"),
+        ),
+        'branch': forms.CharField(
+            required=False,
+            label=_('Branch'),
+            widget=forms.TextInput(attrs={'class': 'form-control'})
+        )
+    }
+    sensitive_parameters = ['password']
+
+    def _build_auth(self):
+        return self.params.get('username'), self.params.get('password')
+
+
+@register_data_backend()
+class GitHubJWTBackend(GitBase):
+    name = 'github-jwt'
+    label = 'GitHub (JWT)'
+    parameters = {
+        # Maybe a file upload field would be better here?
+        'jwt_private_key': forms.CharField(
+            required=False,
+            label=_('JWT Private Key'),
+            widget=forms.Textarea(attrs={'class': 'form-control'}),
+            help_text=_("The private key of the GitHub App in PEM format."),
+        ),
+        'access_token_url': forms.CharField(
+            required=False,
+            label=_('Access Token API URL'),
+            # Guthub Cloud/EMU
+            initial='https://api.github.com/app/installations/{INSTALLATION ID HERE}/access_tokens',
+            # GitHub Enterprise Server
+            # initial='https://{hostname}/api/v3/app/installations/{INSTALLATION ID HERE}/access_tokens',
+            widget=forms.TextInput(attrs={'class': 'form-control'}),
+            help_text=_("The URL for access token API."),
+        ),
+        'app_id': forms.CharField(
+            required=False,
+            label=_('App ID'),
+            widget=forms.TextInput(attrs={'class': 'form-control'}),
+            help_text=_("The ID of the GitHub App."),
+        ),
+        'branch': forms.CharField(
+            required=False,
+            label=_('Branch'),
+            widget=forms.TextInput(attrs={'class': 'form-control'})
+        ),
+    }
+    sensitive_parameters = ['jwt_private_key']
+
+    def _build_auth(self):
+        time_since_epoch_in_seconds = int(time.time())
+        payload = {
+            "iat": time_since_epoch_in_seconds - 10,
+            "exp": time_since_epoch_in_seconds + 9 * 60,
+            "iss": self.params.get('app_id'),
+            "alg": "RS256",
+        }
+        try:
+            encoded_jwt = jwt.encode(payload, self.params.get('jwt_private_key'), algorithm="RS256")
+        except Exception as e:
+            raise SyncError(_("Processing or Encoding GitHub JWT token failed: {error}").format(error=e))
+
+        if not isinstance(encoded_jwt, str):
+            encoded_jwt = encoded_jwt.decode("utf-8")
+        headers = {
+            "Authorization": "Bearer " + encoded_jwt,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        try:
+            r = requests.post(self.params.get('access_token_url'),
+                              headers=headers,
+                              proxies=resolve_proxies(url=self.params.get('access_token_url'),
+                                                      context={'client': self}))
+            r.raise_for_status()
+            app_data = r.json()
+            return self.params.get("app_id"), app_data["token"]
+        except Exception as e:
+            raise SyncError(_("Error fetching access token: {error}").format(error=e))
 
 
 @register_data_backend()
