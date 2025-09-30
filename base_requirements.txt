@@ -125,6 +125,10 @@ nh3
 # https://pillow.readthedocs.io/en/stable/releasenotes/
 Pillow
 
+# PyJWT is used for GitHub JWT Data Backend
+# https://github.com/jpadilla/pyjwt
+PyJWT
+
 # PostgreSQL database adapter for Python
 # https://github.com/psycopg/psycopg/blob/master/docs/news.rst
 psycopg[c,pool]
