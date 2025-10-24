@@ -80,8 +80,8 @@ def get_jinja2_environ(subsystem):
     """
     Retrieve approved environment variables for a given subsystem to be used in Jinja2 templates.
     """
-    approved_environ =  get_config().JINJA2_ENVIRON.get(subsystem, [])
+    approved_environ = get_config().JINJA2_ENVIRON.get(subsystem, [])
     return_data = {}
     for environ in approved_environ:
-        return_data[environ] =  os.environ.get(environ, None)
+        return_data[environ] = os.environ.get(environ, None)
     return return_data
