@@ -130,6 +130,7 @@ HTTP_PROXIES = getattr(configuration, 'HTTP_PROXIES', {})
 INTERNAL_IPS = getattr(configuration, 'INTERNAL_IPS', ('127.0.0.1', '::1'))
 ISOLATED_DEPLOYMENT = getattr(configuration, 'ISOLATED_DEPLOYMENT', False)
 JINJA2_FILTERS = getattr(configuration, 'JINJA2_FILTERS', {})
+JINJA2_ENVIRON = getattr(configuration, 'JINJA2_ENVIRON', {})
 LANGUAGE_CODE = getattr(configuration, 'DEFAULT_LANGUAGE', 'en-us')
 LANGUAGE_COOKIE_PATH = CSRF_COOKIE_PATH
 LOGGING = getattr(configuration, 'LOGGING', {})

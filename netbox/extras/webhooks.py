@@ -1,14 +1,17 @@
 import hashlib
 import hmac
 import logging
-
+import os
 import requests
 from django_rq import job
 from jinja2.exceptions import TemplateError
 
+from netbox.config import get_config
 from netbox.registry import registry
 from utilities.proxy import resolve_proxies
+from utilities.jinja2 import get_jinja2_environ
 from .constants import WEBHOOK_EVENT_TYPES
+
 
 __all__ = (
     'generate_signature',
@@ -57,6 +60,9 @@ def send_webhook(event_rule, object_type, event_type, data, timestamp, username,
         'request_id': request.id if request else None,
         'data': data,
     }
+
+    context.update({"environ": get_jinja2_environ('webhooks')})
+
     if snapshots:
         context.update({
             'snapshots': snapshots
