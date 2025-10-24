@@ -8,6 +8,7 @@ from jinja2.exceptions import TemplateError
 
 from netbox.registry import registry
 from utilities.proxy import resolve_proxies
+from utilities.jinja2 import get_jinja2_environ
 from .constants import WEBHOOK_EVENT_TYPES
 
 __all__ = (
@@ -56,7 +57,12 @@ def send_webhook(event_rule, object_type, event_type, data, timestamp, username,
         'username': username,
         'request_id': request.id if request else None,
         'data': data,
+        'environ': get_jinja2_environ('webhooks')
     }
+    # --OR-- dynamically add if anything is present
+    # environ = get_jinja2_environ('webhooks')
+    # if environ:
+    #     context.update({"environ": environ})
     if snapshots:
         context.update({
             'snapshots': snapshots

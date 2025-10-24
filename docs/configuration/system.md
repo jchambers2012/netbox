@@ -133,6 +133,25 @@ JINJA2_FILTERS = {
 }
 ```
 
+## JINJA2_ENVIRON
+
+Default: `{}`
+
+A dictionary list of approved environment variables that will be ejected into a Jinja2 SandBox.  This can be used to help point webhooks to different location based on if the database is in a Prod, NonProd or Dev system.  Allowing for administrators to use the same data access all platforms
+
+Supported Sandboxes Include:
+ - webhooks
+
+```python
+JINJA2_ENVIRON = {
+    'webhooks': [
+                    'ServiceNowIntegration_URL',
+                    'ServiceNowIntegration_Token'
+                ],
+}
+```
+
+
 ---
 
 ## LOGGING

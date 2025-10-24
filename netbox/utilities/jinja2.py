@@ -1,3 +1,4 @@
+import os
 from django.apps import apps
 from jinja2 import BaseLoader, TemplateNotFound
 from jinja2.meta import find_referenced_templates
@@ -8,6 +9,7 @@ from netbox.config import get_config
 __all__ = (
     'DataFileLoader',
     'render_jinja2',
+    'get_jinja2_environ',
 )
 
 
@@ -73,3 +75,14 @@ def render_jinja2(template_code, context, environment_params=None, data_file=Non
     else:
         template = environment.from_string(source=template_code)
     return template.render(**context)
+
+
+def get_jinja2_environ(subsystem):
+    """
+    Retrieve approved environment variables for a given subsystem to be used in Jinja2 templates.
+    """
+    approved_environ = get_config().JINJA2_ENVIRON.get(subsystem, [])
+    return_data = {}
+    for environ in approved_environ:
+        return_data[environ] = os.environ.get(environ, None)
+    return return_data
