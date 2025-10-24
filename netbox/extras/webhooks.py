@@ -58,9 +58,8 @@ def send_webhook(event_rule, object_type, event_type, data, timestamp, username,
         'username': username,
         'request_id': request.id if request else None,
         'data': data,
+        'environ': get_jinja2_environ('webhooks')
     }
-
-    context.update({"environ": get_jinja2_environ('webhooks')})
 
     if snapshots:
         context.update({
