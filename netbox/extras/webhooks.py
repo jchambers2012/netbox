@@ -11,7 +11,6 @@ from utilities.proxy import resolve_proxies
 from utilities.jinja2 import get_jinja2_environ
 from .constants import WEBHOOK_EVENT_TYPES
 
-
 __all__ = (
     'generate_signature',
     'register_webhook_callback',
