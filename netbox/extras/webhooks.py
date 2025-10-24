@@ -59,6 +59,10 @@ def send_webhook(event_rule, object_type, event_type, data, timestamp, username,
         'data': data,
         'environ': get_jinja2_environ('webhooks')
     }
+    # --OR-- dynamically add if anything is present
+    # environ = get_jinja2_environ('webhooks')
+    # if environ:
+    #     context.update({"environ": environ})
     if snapshots:
         context.update({
             'snapshots': snapshots
