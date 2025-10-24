@@ -1,12 +1,11 @@
 import hashlib
 import hmac
 import logging
-import os
+
 import requests
 from django_rq import job
 from jinja2.exceptions import TemplateError
 
-from netbox.config import get_config
 from netbox.registry import registry
 from utilities.proxy import resolve_proxies
 from utilities.jinja2 import get_jinja2_environ
