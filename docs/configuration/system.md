@@ -144,7 +144,10 @@ Supported Sandboxes Include:
 
 ```python
 JINJA2_ENVIRON = {
-    'webhooks': ['ServiceNowIntegrationURL'],
+    'webhooks': [
+                    'ServiceNowIntegration_URL',
+                    'ServiceNowIntegration_Token'
+                ],
 }
 ```
 
