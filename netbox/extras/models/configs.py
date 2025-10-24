@@ -1,23 +1,25 @@
-from django.apps import apps
+import jsonschema
+from collections import defaultdict
+from jsonschema.exceptions import ValidationError as JSONValidationError
+
 from django.conf import settings
 from django.core.validators import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from jinja2.loaders import BaseLoader
-from jinja2.sandbox import SandboxedEnvironment
 
+from core.models import ObjectType
+from extras.models.mixins import RenderTemplateMixin
 from extras.querysets import ConfigContextQuerySet
-from netbox.config import get_config
-from netbox.models import ChangeLoggedModel
+from netbox.models import ChangeLoggedModel, PrimaryModel
 from netbox.models.features import CloningMixin, CustomLinksMixin, ExportTemplatesMixin, SyncedDataMixin, TagsMixin
-from netbox.registry import registry
 from utilities.data import deepmerge
-from utilities.jinja2 import DataFileLoader
+from utilities.jsonschema import validate_schema
 
 __all__ = (
     'ConfigContext',
     'ConfigContextModel',
+    'ConfigContextProfile',
     'ConfigTemplate',
 )
 
@@ -25,6 +27,46 @@ __all__ = (
 #
 # Config contexts
 #
+
+class ConfigContextProfile(SyncedDataMixin, PrimaryModel):
+    """
+    A profile which can be used to enforce parameters on a ConfigContext.
+    """
+    name = models.CharField(
+        verbose_name=_('name'),
+        max_length=100,
+        unique=True
+    )
+    description = models.CharField(
+        verbose_name=_('description'),
+        max_length=200,
+        blank=True
+    )
+    schema = models.JSONField(
+        blank=True,
+        null=True,
+        validators=[validate_schema],
+        verbose_name=_('schema'),
+        help_text=_('A JSON schema specifying the structure of the context data for this profile')
+    )
+
+    clone_fields = ('schema',)
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = _('config context profile')
+        verbose_name_plural = _('config context profiles')
+
+    def __str__(self):
+        return self.name
+
+    def sync_data(self):
+        """
+        Synchronize schema from the designated DataFile (if any).
+        """
+        self.schema = self.data_file.get_data()
+    sync_data.alters_data = True
+
 
 class ConfigContext(SyncedDataMixin, CloningMixin, CustomLinksMixin, ChangeLoggedModel):
     """
@@ -36,6 +78,13 @@ class ConfigContext(SyncedDataMixin, CloningMixin, CustomLinksMixin, ChangeLogge
         verbose_name=_('name'),
         max_length=100,
         unique=True
+    )
+    profile = models.ForeignKey(
+        to='extras.ConfigContextProfile',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='config_contexts',
     )
     weight = models.PositiveSmallIntegerField(
         verbose_name=_('weight'),
@@ -120,9 +169,8 @@ class ConfigContext(SyncedDataMixin, CloningMixin, CustomLinksMixin, ChangeLogge
     objects = ConfigContextQuerySet.as_manager()
 
     clone_fields = (
-        'weight', 'is_active', 'regions', 'site_groups', 'sites', 'locations', 'device_types',
-        'roles', 'platforms', 'cluster_types', 'cluster_groups', 'clusters', 'tenant_groups',
-        'tenants', 'tags', 'data',
+        'weight', 'profile', 'is_active', 'regions', 'site_groups', 'sites', 'locations', 'device_types', 'roles',
+        'platforms', 'cluster_types', 'cluster_groups', 'clusters', 'tenant_groups', 'tenants', 'tags', 'data',
     )
 
     class Meta:
@@ -148,6 +196,13 @@ class ConfigContext(SyncedDataMixin, CloningMixin, CustomLinksMixin, ChangeLogge
             raise ValidationError(
                 {'data': _('JSON data must be in object form. Example:') + ' {"foo": 123}'}
             )
+
+        # Validate config data against the assigned profile's schema (if any)
+        if self.profile and self.profile.schema:
+            try:
+                jsonschema.validate(self.data, schema=self.profile.schema)
+            except JSONValidationError as e:
+                raise ValidationError(_("Data does not conform to profile schema: {error}").format(error=e))
 
     def sync_data(self):
         """
@@ -210,7 +265,9 @@ class ConfigContextModel(models.Model):
 # Config templates
 #
 
-class ConfigTemplate(SyncedDataMixin, CustomLinksMixin, ExportTemplatesMixin, TagsMixin, ChangeLoggedModel):
+class ConfigTemplate(
+    RenderTemplateMixin, SyncedDataMixin, CustomLinksMixin, ExportTemplatesMixin, TagsMixin, ChangeLoggedModel
+):
     name = models.CharField(
         verbose_name=_('name'),
         max_length=100
@@ -219,20 +276,6 @@ class ConfigTemplate(SyncedDataMixin, CustomLinksMixin, ExportTemplatesMixin, Ta
         verbose_name=_('description'),
         max_length=200,
         blank=True
-    )
-    template_code = models.TextField(
-        verbose_name=_('template code'),
-        help_text=_('Jinja2 template code.')
-    )
-    environment_params = models.JSONField(
-        verbose_name=_('environment parameters'),
-        blank=True,
-        null=True,
-        default=dict,
-        help_text=_(
-            'Any <a href="https://jinja.palletsprojects.com/en/3.1.x/api/#jinja2.Environment">additional parameters</a>'
-            ' to pass when constructing the Jinja2 environment.'
-        )
     )
 
     class Meta:
@@ -253,53 +296,16 @@ class ConfigTemplate(SyncedDataMixin, CustomLinksMixin, ExportTemplatesMixin, Ta
         self.template_code = self.data_file.data_as_string
     sync_data.alters_data = True
 
-    def render(self, context=None):
-        """
-        Render the contents of the template.
-        """
-        _context = dict()
+    def get_context(self, context=None, queryset=None):
+        _context = defaultdict(dict)
 
-        # Populate the default template context with NetBox model classes, namespaced by app
-        for app, model_names in registry['models'].items():
-            _context.setdefault(app, {})
-            for model_name in model_names:
-                try:
-                    model = apps.get_registered_model(app, model_name)
-                    _context[app][model.__name__] = model
-                except LookupError:
-                    pass
+        # Populate all public models for reference within the template
+        for object_type in ObjectType.objects.public():
+            if model := object_type.model_class():
+                _context[object_type.app_label][model.__name__] = model
 
-        # Add the provided context data, if any
+        # Apply the provided context data, if any
         if context is not None:
             _context.update(context)
 
-        # Initialize the Jinja2 environment and instantiate the Template
-        environment = self._get_environment()
-        if self.data_file:
-            template = environment.get_template(self.data_file.path)
-        else:
-            template = environment.from_string(self.template_code)
-        output = template.render(**_context)
-
-        # Replace CRLF-style line terminators
-        return output.replace('\r\n', '\n')
-
-    def _get_environment(self):
-        """
-        Instantiate and return a Jinja2 environment suitable for rendering the ConfigTemplate.
-        """
-        # Initialize the template loader & cache the base template code (if applicable)
-        if self.data_file:
-            loader = DataFileLoader(data_source=self.data_source)
-            loader.cache_templates({
-                self.data_file.path: self.template_code
-            })
-        else:
-            loader = BaseLoader()
-
-        # Initialize the environment
-        env_params = self.environment_params or {}
-        environment = SandboxedEnvironment(loader=loader, **env_params)
-        environment.filters.update(get_config().JINJA2_FILTERS)
-
-        return environment
+        return _context

@@ -8,15 +8,18 @@ from dcim.models import DeviceRole, DeviceType, Location, Platform, Region, Site
 from netbox.filtersets import BaseFilterSet, ChangeLoggedModelFilterSet, NetBoxModelFilterSet
 from tenancy.models import Tenant, TenantGroup
 from users.models import Group, User
-from utilities.filters import ContentTypeFilter, MultiValueCharFilter, MultiValueNumberFilter
+from utilities.filters import (
+    ContentTypeFilter, MultiValueCharFilter, MultiValueNumberFilter
+)
 from virtualization.models import Cluster, ClusterGroup, ClusterType
 from .choices import *
-from .filters import TagFilter
+from .filters import TagFilter, TagIDFilter
 from .models import *
 
 __all__ = (
     'BookmarkFilterSet',
     'ConfigContextFilterSet',
+    'ConfigContextProfileFilterSet',
     'ConfigTemplateFilterSet',
     'CustomFieldChoiceSetFilterSet',
     'CustomFieldFilterSet',
@@ -27,10 +30,11 @@ __all__ = (
     'JournalEntryFilterSet',
     'LocalConfigContextFilterSet',
     'NotificationGroupFilterSet',
-    'ObjectTypeFilterSet',
     'SavedFilterFilterSet',
     'ScriptFilterSet',
+    'TableConfigFilterSet',
     'TagFilterSet',
+    'TaggedItemFilterSet',
     'WebhookFilterSet',
 )
 
@@ -257,8 +261,8 @@ class ExportTemplateFilterSet(ChangeLoggedModelFilterSet):
     class Meta:
         model = ExportTemplate
         fields = (
-            'id', 'name', 'description', 'mime_type', 'file_extension', 'as_attachment', 'auto_sync_enabled',
-            'data_synced',
+            'id', 'name', 'description', 'mime_type', 'file_name', 'file_extension', 'as_attachment',
+            'auto_sync_enabled', 'data_synced',
         )
 
     def search(self, queryset, name, value):
@@ -266,7 +270,8 @@ class ExportTemplateFilterSet(ChangeLoggedModelFilterSet):
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(description__icontains=value)
+            Q(description__icontains=value) |
+            Q(file_name__icontains=value)
         )
 
 
@@ -311,6 +316,59 @@ class SavedFilterFilterSet(ChangeLoggedModelFilterSet):
     def _usable(self, queryset, name, value):
         """
         Return only SavedFilters that are both enabled and are shared (or belong to the current user).
+        """
+        user = self.request.user if self.request else None
+        if not user or user.is_anonymous:
+            if value:
+                return queryset.filter(enabled=True, shared=True)
+            return queryset.filter(Q(enabled=False) | Q(shared=False))
+        if value:
+            return queryset.filter(enabled=True).filter(Q(shared=True) | Q(user=user))
+        return queryset.filter(Q(enabled=False) | Q(Q(shared=False) & ~Q(user=user)))
+
+
+class TableConfigFilterSet(ChangeLoggedModelFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    object_type_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ObjectType.objects.all(),
+        field_name='object_type'
+    )
+    object_type = ContentTypeFilter(
+        field_name='object_type'
+    )
+    user_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=User.objects.all(),
+        label=_('User (ID)'),
+    )
+    user = django_filters.ModelMultipleChoiceFilter(
+        field_name='user__username',
+        queryset=User.objects.all(),
+        to_field_name='username',
+        label=_('User (name)'),
+    )
+    usable = django_filters.BooleanFilter(
+        method='_usable'
+    )
+
+    class Meta:
+        model = TableConfig
+        fields = ('id', 'name', 'description', 'table', 'enabled', 'shared', 'weight')
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(table__icontains=value)
+        )
+
+    def _usable(self, queryset, name, value):
+        """
+        Return only TableConfigs that are both enabled and are shared (or belong to the current user).
         """
         user = self.request.user if self.request else None
         if not user or user.is_anonymous:
@@ -394,12 +452,16 @@ class ImageAttachmentFilterSet(ChangeLoggedModelFilterSet):
 
     class Meta:
         model = ImageAttachment
-        fields = ('id', 'object_type_id', 'object_id', 'name', 'image_width', 'image_height')
+        fields = ('id', 'object_type_id', 'object_id', 'name', 'description', 'image_width', 'image_height')
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
-        return queryset.filter(name__icontains=value)
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(image__icontains=value) |
+            Q(description__icontains=value)
+        )
 
 
 class JournalEntryFilterSet(NetBoxModelFilterSet):
@@ -449,7 +511,7 @@ class TagFilterSet(ChangeLoggedModelFilterSet):
 
     class Meta:
         model = Tag
-        fields = ('id', 'name', 'slug', 'color', 'description', 'object_types')
+        fields = ('id', 'name', 'slug', 'color', 'weight', 'description', 'object_types')
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -492,10 +554,85 @@ class TagFilterSet(ChangeLoggedModelFilterSet):
         )
 
 
+class TaggedItemFilterSet(BaseFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    object_type = ContentTypeFilter(
+        field_name='content_type'
+    )
+    object_type_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ContentType.objects.all(),
+        field_name='content_type_id'
+    )
+    tag_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=Tag.objects.all()
+    )
+    tag = django_filters.ModelMultipleChoiceFilter(
+        field_name='tag__slug',
+        queryset=Tag.objects.all(),
+        to_field_name='slug',
+    )
+
+    class Meta:
+        model = TaggedItem
+        fields = ('id', 'object_id')
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(tag__name__icontains=value) |
+            Q(tag__slug__icontains=value) |
+            Q(tag__description__icontains=value)
+        )
+
+
+class ConfigContextProfileFilterSet(NetBoxModelFilterSet):
+    q = django_filters.CharFilter(
+        method='search',
+        label=_('Search'),
+    )
+    data_source_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data source (ID)'),
+    )
+    data_file_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=DataSource.objects.all(),
+        label=_('Data file (ID)'),
+    )
+
+    class Meta:
+        model = ConfigContextProfile
+        fields = (
+            'id', 'name', 'description', 'auto_sync_enabled', 'data_synced',
+        )
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(comments__icontains=value)
+        )
+
+
 class ConfigContextFilterSet(ChangeLoggedModelFilterSet):
     q = django_filters.CharFilter(
         method='search',
         label=_('Search'),
+    )
+    profile_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ConfigContextProfile.objects.all(),
+        label=_('Profile (ID)'),
+    )
+    profile = django_filters.ModelMultipleChoiceFilter(
+        field_name='profile__name',
+        queryset=ConfigContextProfile.objects.all(),
+        to_field_name='name',
+        label=_('Profile (name)'),
     )
     region_id = django_filters.ModelMultipleChoiceFilter(
         field_name='regions',
@@ -665,10 +802,14 @@ class ConfigTemplateFilterSet(ChangeLoggedModelFilterSet):
         label=_('Data file (ID)'),
     )
     tag = TagFilter()
+    tag_id = TagIDFilter()
 
     class Meta:
         model = ConfigTemplate
-        fields = ('id', 'name', 'description', 'auto_sync_enabled', 'data_synced')
+        fields = (
+            'id', 'name', 'description', 'mime_type', 'file_name', 'file_extension', 'as_attachment',
+            'auto_sync_enabled', 'data_synced'
+        )
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -691,26 +832,3 @@ class LocalConfigContextFilterSet(django_filters.FilterSet):
 
     def _local_context_data(self, queryset, name, value):
         return queryset.exclude(local_context_data__isnull=value)
-
-
-#
-# ContentTypes
-#
-
-class ObjectTypeFilterSet(django_filters.FilterSet):
-    q = django_filters.CharFilter(
-        method='search',
-        label=_('Search'),
-    )
-
-    class Meta:
-        model = ObjectType
-        fields = ('id', 'app_label', 'model')
-
-    def search(self, queryset, name, value):
-        if not value.strip():
-            return queryset
-        return queryset.filter(
-            Q(app_label__icontains=value) |
-            Q(model__icontains=value)
-        )

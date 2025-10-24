@@ -13,6 +13,8 @@ FILTER_CHAR_BASED_LOOKUP_MAP = dict(
     ie='iexact',
     nie='iexact',
     empty='empty',
+    regex='regex',
+    iregex='iregex',
 )
 
 FILTER_NUMERIC_BASED_LOOKUP_MAP = dict(
@@ -71,6 +73,7 @@ HTTP_REQUEST_J2_SAFE_COPY = [
 CSV_DELIMITERS = {
     'comma': ',',
     'semicolon': ';',
+    'pipe': '|',
     'tab': '\t',
 }
 

@@ -7,8 +7,10 @@ from django.utils import timezone
 from rq.job import Job as RQ_Job, JobStatus
 from rq.registry import FailedJobRegistry, StartedJobRegistry
 
+from rest_framework import status
 from users.models import Token, User
 from utilities.testing import APITestCase, APIViewTestCases, TestCase
+from utilities.testing.utils import disable_logging
 from ..models import *
 
 
@@ -100,6 +102,22 @@ class DataFileTest(
         DataFile.objects.bulk_create(data_files)
 
 
+class ObjectTypeTest(APITestCase):
+
+    def test_list_objects(self):
+        object_type_count = ObjectType.objects.count()
+
+        response = self.client.get(reverse('extras-api:objecttype-list'), **self.header)
+        self.assertHttpStatus(response, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], object_type_count)
+
+    def test_get_object(self):
+        object_type = ObjectType.objects.first()
+
+        url = reverse('extras-api:objecttype-detail', kwargs={'pk': object_type.pk})
+        self.assertHttpStatus(self.client.get(url, **self.header), status.HTTP_200_OK)
+
+
 class BackgroundTaskTestCase(TestCase):
     user_permissions = ()
 
@@ -189,7 +207,8 @@ class BackgroundTaskTestCase(TestCase):
         # Enqueue & run a job that will fail
         job = queue.enqueue(self.dummy_job_failing)
         worker = get_worker('default')
-        worker.work(burst=True)
+        with disable_logging():
+            worker.work(burst=True)
         self.assertTrue(job.is_failed)
 
         # Re-enqueue the failed job and check that its status has been reset
@@ -231,7 +250,8 @@ class BackgroundTaskTestCase(TestCase):
         self.assertEqual(job.get_status(), JobStatus.STARTED)
         response = self.client.post(reverse('core-api:rqtask-stop', args=[job.id]), **self.header)
         self.assertEqual(response.status_code, 200)
-        worker.monitor_work_horse(job, queue)  # Sets the job as Failed and removes from Started
+        with disable_logging():
+            worker.monitor_work_horse(job, queue)  # Sets the job as Failed and removes from Started
         started_job_registry = StartedJobRegistry(queue.name, connection=queue.connection)
         self.assertEqual(len(started_job_registry), 0)
 

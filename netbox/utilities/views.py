@@ -1,16 +1,20 @@
+from dataclasses import dataclass
 from typing import Iterable
 
 from django.conf import settings
 from django.contrib.auth.mixins import AccessMixin
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import QuerySet
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
 
+from netbox.api.authentication import TokenAuthentication
 from netbox.plugins import PluginConfig
 from netbox.registry import registry
 from utilities.relations import get_related_models
+from utilities.request import safe_for_redirect
+from utilities.string import title
 from .permissions import resolve_permission
 
 __all__ = (
@@ -19,7 +23,9 @@ __all__ = (
     'GetRelatedModelsMixin',
     'GetReturnURLMixin',
     'ObjectPermissionRequiredMixin',
+    'TokenConditionalLoginRequiredMixin',
     'ViewTab',
+    'get_action_url',
     'get_viewname',
     'register_model_view',
 )
@@ -36,6 +42,19 @@ class ConditionalLoginRequiredMixin(AccessMixin):
     def dispatch(self, request, *args, **kwargs):
         if settings.LOGIN_REQUIRED and not request.user.is_authenticated:
             return self.handle_no_permission()
+        return super().dispatch(request, *args, **kwargs)
+
+
+class TokenConditionalLoginRequiredMixin(ConditionalLoginRequiredMixin):
+    def dispatch(self, request, *args, **kwargs):
+        # Attempt to authenticate the user using a DRF token, if provided
+        if settings.LOGIN_REQUIRED and not request.user.is_authenticated:
+            authenticator = TokenAuthentication()
+            auth_info = authenticator.authenticate(request)
+            if auth_info is not None:
+                request.user = auth_info[0]  # User object
+                request.auth = auth_info[1]
+
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -136,7 +155,7 @@ class GetReturnURLMixin:
         # First, see if `return_url` was specified as a query parameter or form data. Use this URL only if it's
         # considered safe.
         return_url = request.GET.get('return_url') or request.POST.get('return_url')
-        if return_url and url_has_allowed_host_and_scheme(return_url, allowed_hosts=None):
+        if return_url and safe_for_redirect(return_url):
             return return_url
 
         # Next, check if the object being modified (if any) has an absolute URL.
@@ -149,9 +168,8 @@ class GetReturnURLMixin:
 
         # Attempt to dynamically resolve the list view for the object
         if hasattr(self, 'queryset'):
-            model_opts = self.queryset.model._meta
             try:
-                return reverse(f'{model_opts.app_label}:{model_opts.model_name}_list')
+                return get_action_url(self.queryset.model, action='list')
             except NoReverseMatch:
                 pass
 
@@ -163,8 +181,17 @@ class GetRelatedModelsMixin:
     """
     Provides logic for collecting all related models for the currently viewed model.
     """
+    @dataclass
+    class RelatedObjectCount:
+        queryset: QuerySet
+        filter_param: str
+        label: str = ''
 
-    def get_related_models(self, request, instance, omit=[], extra=[]):
+        @property
+        def name(self):
+            return self.label or title(_(self.queryset.model._meta.verbose_name_plural))
+
+    def get_related_models(self, request, instance, omit=None, extra=None):
         """
         Get related models of the view's `queryset` model without those listed in `omit`. Will be sorted alphabetical.
 
@@ -177,6 +204,7 @@ class GetRelatedModelsMixin:
             extra: Add extra models to the list of automatically determined related models. Can be used to add indirect
                 relationships.
         """
+        omit = omit or []
         model = self.queryset.model
         related = filter(
             lambda m: m[0] is not model and m[0] not in omit,
@@ -184,7 +212,7 @@ class GetRelatedModelsMixin:
         )
 
         related_models = [
-            (
+            self.RelatedObjectCount(
                 model.objects.restrict(request.user, 'view').filter(**(
                     {f'{field}__in': instance}
                     if isinstance(instance, Iterable)
@@ -194,11 +222,14 @@ class GetRelatedModelsMixin:
             )
             for model, field in related
         ]
-        related_models.extend(extra)
+        if extra is not None:
+            related_models.extend([
+                self.RelatedObjectCount(*attrs) for attrs in extra
+            ])
 
         return sorted(
-            filter(lambda qs: qs[0].exists(), related_models),
-            key=lambda qs: qs[0].model._meta.verbose_name.lower(),
+            filter(lambda roc: roc.queryset.exists(), related_models),
+            key=lambda roc: roc.name,
         )
 
 
@@ -209,22 +240,30 @@ class ViewTab:
 
     Args:
         label: Human-friendly text
+        visible: A callable which determines whether the tab should be displayed. This callable must accept exactly one
+            argument: the object instance. If a callable is not specified, the tab's visibility will be determined by
+            its badge (if any) and the value of `hide_if_empty`.
         badge: A static value or callable to display alongside the label (optional). If a callable is used, it must
             accept a single argument representing the object being viewed.
         weight: Numeric weight to influence ordering among other tabs (default: 1000)
         permission: The permission required to display the tab (optional).
-        hide_if_empty: If true, the tab will be displayed only if its badge has a meaningful value. (Tabs without a
-            badge are always displayed.)
+        hide_if_empty: If true, the tab will be displayed only if its badge has a meaningful value. (This parameter is
+            evaluated only if the tab is permitted to be displayed according to the `visible` parameter.)
     """
-    def __init__(self, label, badge=None, weight=1000, permission=None, hide_if_empty=False):
+    def __init__(self, label, visible=None, badge=None, weight=1000, permission=None, hide_if_empty=False):
         self.label = label
+        self.visible = visible
         self.badge = badge
         self.weight = weight
         self.permission = permission
         self.hide_if_empty = hide_if_empty
 
     def render(self, instance):
-        """Return the attributes needed to render a tab in HTML."""
+        """
+        Return the attributes needed to render a tab in HTML if the tab should be displayed. Otherwise, return None.
+        """
+        if self.visible is not None and not self.visible(instance):
+            return None
         badge_value = self._get_badge_value(instance)
         if self.badge and self.hide_if_empty and not badge_value:
             return None
@@ -273,6 +312,22 @@ def get_viewname(model, action=None, rest_api=False):
             viewname = f'{viewname}_{action}'
 
     return viewname
+
+
+def get_action_url(model, action=None, rest_api=False, kwargs=None):
+    """
+    Return the URL for the given model and action, if valid; otherwise raise NoReverseMatch.
+    Will defer to _get_action_url() on the model if it exists.
+
+    :param model: The model or instance to which the URL belongs
+    :param action: A string indicating the desired action (if any); e.g. "add" or "list"
+    :param rest_api: A boolean indicating whether this is a REST API action
+    :param kwargs: A dictionary of keyword arguments for the view to include when resolving its URL path (optional)
+    """
+    if hasattr(model, '_get_action_url'):
+        return model._get_action_url(action, rest_api, kwargs)
+
+    return reverse(get_viewname(model, action, rest_api), kwargs=kwargs)
 
 
 def register_model_view(model, name='', path=None, detail=True, kwargs=None):

@@ -18,10 +18,10 @@ pg_dump --username netbox --password --host localhost netbox > netbox.sql
 !!! note
     You may need to change the username, host, and/or database in the command above to match your installation.
 
-When replicating a production database for development purposes, you may find it convenient to exclude changelog data, which can easily account for the bulk of a database's size. To do this, exclude the `extras_objectchange` table data from the export. The table will still be included in the output file, but will not be populated with any data.
+When replicating a production database for development purposes, you may find it convenient to exclude changelog data, which can easily account for the bulk of a database's size. To do this, exclude the `core_objectchange` table data from the export. The table will still be included in the output file, but will not be populated with any data.
 
 ```no-highlight
-pg_dump ... --exclude-table-data=extras_objectchange netbox > netbox.sql
+pg_dump ... --exclude-table-data=core_objectchange netbox > netbox.sql
 ```
 
 ### Load an Exported Database
@@ -54,7 +54,7 @@ pg_dump --username netbox --password --host localhost -s netbox > netbox_schema.
 By default, NetBox stores uploaded files (such as image attachments) in its media directory. To fully replicate an instance of NetBox, you'll need to copy both the database and the media files.
 
 !!! note
-    These operations are not necessary if your installation is utilizing a [remote storage backend](../configuration/system.md#storage_backend).
+    These operations are not necessary if your installation is utilizing a [remote storage backend](../configuration/system.md#storages).
 
 ### Archive the Media Directory
 

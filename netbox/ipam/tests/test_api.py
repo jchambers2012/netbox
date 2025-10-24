@@ -1,5 +1,7 @@
 import json
+import logging
 
+from django.test import tag
 from django.urls import reverse
 from netaddr import IPNetwork
 from rest_framework import status
@@ -9,7 +11,7 @@ from ipam.choices import *
 from ipam.models import *
 from tenancy.models import Tenant
 from utilities.data import string_to_ranges
-from utilities.testing import APITestCase, APIViewTestCases, create_test_device, disable_warnings
+from utilities.testing import APITestCase, APIViewTestCases, create_test_device, disable_logging
 
 
 class AppTest(APITestCase):
@@ -381,6 +383,18 @@ class PrefixTest(APIViewTestCases.APIViewTestCase):
             Prefix(prefix=IPNetwork('192.168.3.0/24')),
         )
         Prefix.objects.bulk_create(prefixes)
+
+    @tag('regression')
+    def test_clean_validates_scope(self):
+        prefix = Prefix.objects.first()
+        site = Site.objects.create(name='Test Site', slug='test-site')
+
+        data = {'scope_type': 'dcim.site', 'scope_id': site.id}
+        url = reverse('ipam-api:prefix-detail', kwargs={'pk': prefix.pk})
+        self.add_permissions('ipam.change_prefix')
+
+        response = self.client.patch(url, data, format='json', **self.header)
+        self.assertHttpStatus(response, status.HTTP_200_OK)
 
     def test_list_available_prefixes(self):
         """
@@ -1026,7 +1040,7 @@ class VLANTest(APIViewTestCases.APIViewTestCase):
 
         self.add_permissions('ipam.delete_vlan')
         url = reverse('ipam-api:vlan-detail', kwargs={'pk': vlan.pk})
-        with disable_warnings('netbox.api.views.ModelViewSet'):
+        with disable_logging(level=logging.WARNING):
             response = self.client.delete(url, **self.header)
 
         self.assertHttpStatus(response, status.HTTP_409_CONFLICT)
@@ -1094,6 +1108,10 @@ class VLANTranslationRuleTest(APIViewTestCases.APIViewTestCase):
                 name='Policy 2',
                 description='foobar2',
             ),
+            VLANTranslationPolicy(
+                name='Policy 3',
+                description='foobar2',
+            ),
         )
         VLANTranslationPolicy.objects.bulk_create(vlan_translation_policies)
 
@@ -1138,7 +1156,8 @@ class VLANTranslationRuleTest(APIViewTestCases.APIViewTestCase):
         ]
 
         cls.bulk_update_data = {
-            'policy': vlan_translation_policies[1].pk,
+            'policy': vlan_translation_policies[2].pk,
+            'description': 'New description',
         }
 
 
@@ -1148,6 +1167,7 @@ class ServiceTemplateTest(APIViewTestCases.APIViewTestCase):
     bulk_update_data = {
         'description': 'New description',
     }
+    graphql_base_name = 'service_template'
 
     @classmethod
     def setUpTestData(cls):
@@ -1183,6 +1203,7 @@ class ServiceTest(APIViewTestCases.APIViewTestCase):
     bulk_update_data = {
         'description': 'New description',
     }
+    graphql_base_name = 'service'
 
     @classmethod
     def setUpTestData(cls):
@@ -1198,27 +1219,30 @@ class ServiceTest(APIViewTestCases.APIViewTestCase):
         Device.objects.bulk_create(devices)
 
         services = (
-            Service(device=devices[0], name='Service 1', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[1]),
-            Service(device=devices[0], name='Service 2', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[2]),
-            Service(device=devices[0], name='Service 3', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[3]),
+            Service(parent=devices[0], name='Service 1', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[1]),
+            Service(parent=devices[0], name='Service 2', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[2]),
+            Service(parent=devices[0], name='Service 3', protocol=ServiceProtocolChoices.PROTOCOL_TCP, ports=[3]),
         )
         Service.objects.bulk_create(services)
 
         cls.create_data = [
             {
-                'device': devices[1].pk,
+                'parent_object_id': devices[1].pk,
+                'parent_object_type': 'dcim.device',
                 'name': 'Service 4',
                 'protocol': ServiceProtocolChoices.PROTOCOL_TCP,
                 'ports': [4],
             },
             {
-                'device': devices[1].pk,
+                'parent_object_id': devices[1].pk,
+                'parent_object_type': 'dcim.device',
                 'name': 'Service 5',
                 'protocol': ServiceProtocolChoices.PROTOCOL_TCP,
                 'ports': [5],
             },
             {
-                'device': devices[1].pk,
+                'parent_object_id': devices[1].pk,
+                'parent_object_type': 'dcim.device',
                 'name': 'Service 6',
                 'protocol': ServiceProtocolChoices.PROTOCOL_TCP,
                 'ports': [6],

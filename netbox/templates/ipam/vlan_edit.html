@@ -5,6 +5,10 @@
 {% load i18n %}
 
 {% block form %}
+  {% for field in form.hidden_fields %}
+    {{ field }}
+  {% endfor %}
+
   <div class="field-group my-5">
     <div class="row">
       <h2 class="col-9 offset-3">{% trans "VLAN" %}</h2>
@@ -72,5 +76,10 @@
 
   <div class="field-group my-5">
     {% render_field form.comments %}
+  </div>
+
+  {# Meta fields #}
+  <div class="bg-primary-subtle border border-primary rounded-1 pt-3 px-3 mb-3">
+    {% render_field form.changelog_message %}
   </div>
 {% endblock %}

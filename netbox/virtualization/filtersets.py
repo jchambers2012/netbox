@@ -171,23 +171,28 @@ class VirtualMachineFilterSet(
     name = MultiValueCharFilter(
         lookup_expr='iexact'
     )
-    role_id = django_filters.ModelMultipleChoiceFilter(
+    role_id = TreeNodeMultipleChoiceFilter(
         queryset=DeviceRole.objects.all(),
+        lookup_expr='in',
         label=_('Role (ID)'),
     )
-    role = django_filters.ModelMultipleChoiceFilter(
-        field_name='role__slug',
+    role = TreeNodeMultipleChoiceFilter(
+        field_name='role',
         queryset=DeviceRole.objects.all(),
+        lookup_expr='in',
         to_field_name='slug',
         label=_('Role (slug)'),
     )
-    platform_id = django_filters.ModelMultipleChoiceFilter(
+    platform_id = TreeNodeMultipleChoiceFilter(
         queryset=Platform.objects.all(),
+        field_name='platform',
+        lookup_expr='in',
         label=_('Platform (ID)'),
     )
-    platform = django_filters.ModelMultipleChoiceFilter(
-        field_name='platform__slug',
+    platform = TreeNodeMultipleChoiceFilter(
         queryset=Platform.objects.all(),
+        field_name='platform',
+        lookup_expr='in',
         to_field_name='slug',
         label=_('Platform (slug)'),
     )

@@ -27,7 +27,8 @@ class DataSourceTestCase(TestCase, ChangeLoggedFilterSetTests):
                 source_url='file:///var/tmp/source1/',
                 status=DataSourceStatusChoices.NEW,
                 enabled=True,
-                description='foobar1'
+                description='foobar1',
+                sync_interval=JobIntervalChoices.INTERVAL_HOURLY
             ),
             DataSource(
                 name='Data Source 2',
@@ -35,14 +36,16 @@ class DataSourceTestCase(TestCase, ChangeLoggedFilterSetTests):
                 source_url='file:///var/tmp/source2/',
                 status=DataSourceStatusChoices.SYNCING,
                 enabled=True,
-                description='foobar2'
+                description='foobar2',
+                sync_interval=JobIntervalChoices.INTERVAL_DAILY
             ),
             DataSource(
                 name='Data Source 3',
                 type='git',
                 source_url='https://example.com/git/source3',
                 status=DataSourceStatusChoices.COMPLETED,
-                enabled=False
+                enabled=False,
+                sync_interval=JobIntervalChoices.INTERVAL_WEEKLY
             ),
         )
         DataSource.objects.bulk_create(data_sources)
@@ -71,6 +74,10 @@ class DataSourceTestCase(TestCase, ChangeLoggedFilterSetTests):
 
     def test_status(self):
         params = {'status': [DataSourceStatusChoices.NEW, DataSourceStatusChoices.SYNCING]}
+        self.assertEqual(self.filterset(params, self.queryset).qs.count(), 2)
+
+    def test_sync_interval(self):
+        params = {'sync_interval': [JobIntervalChoices.INTERVAL_HOURLY, JobIntervalChoices.INTERVAL_DAILY]}
         self.assertEqual(self.filterset(params, self.queryset).qs.count(), 2)
 
 
@@ -143,7 +150,7 @@ class DataFileTestCase(TestCase, ChangeLoggedFilterSetTests):
 class ObjectChangeTestCase(TestCase, BaseFilterSetTests):
     queryset = ObjectChange.objects.all()
     filterset = ObjectChangeFilterSet
-    ignore_fields = ('prechange_data', 'postchange_data')
+    ignore_fields = ('message', 'prechange_data', 'postchange_data')
 
     @classmethod
     def setUpTestData(cls):
@@ -234,3 +241,48 @@ class ObjectChangeTestCase(TestCase, BaseFilterSetTests):
         self.assertEqual(self.filterset(params, self.queryset).qs.count(), 3)
         params = {'changed_object_type_id': [ContentType.objects.get(app_label='dcim', model='site').pk]}
         self.assertEqual(self.filterset(params, self.queryset).qs.count(), 3)
+
+
+class ObjectTypeTestCase(TestCase, BaseFilterSetTests):
+    queryset = ObjectType.objects.all()
+    filterset = ObjectTypeFilterSet
+    ignore_fields = (
+        'custom_fields',
+        'custom_links',
+        'event_rules',
+        'export_templates',
+        'object_permissions',
+        'saved_filters',
+    )
+
+    def test_q(self):
+        params = {'q': 'vrf'}
+        self.assertEqual(self.filterset(params, self.queryset).qs.count(), 1)
+
+    def test_app_label(self):
+        self.assertEqual(
+            self.filterset({'app_label': ['dcim']}, self.queryset).qs.count(),
+            ObjectType.objects.filter(app_label='dcim').count(),
+        )
+
+    def test_model(self):
+        self.assertEqual(
+            self.filterset({'model': ['site']}, self.queryset).qs.count(),
+            ObjectType.objects.filter(model='site').count(),
+        )
+
+    def test_public(self):
+        self.assertEqual(
+            self.filterset({'public': True}, self.queryset).qs.count(),
+            ObjectType.objects.filter(public=True).count(),
+        )
+        self.assertEqual(
+            self.filterset({'public': False}, self.queryset).qs.count(),
+            ObjectType.objects.filter(public=False).count(),
+        )
+
+    def test_feature(self):
+        self.assertEqual(
+            self.filterset({'features': 'tags'}, self.queryset).qs.count(),
+            ObjectType.objects.filter(features__contains=['tags']).count(),
+        )

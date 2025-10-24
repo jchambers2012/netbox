@@ -9,17 +9,11 @@ Begin by installing all system packages required by NetBox and its dependencies.
 !!! warning "Python 3.10 or later required"
     NetBox supports Python 3.10, 3.11, and 3.12.
 
-=== "Ubuntu"
-
-    ```no-highlight
-    sudo apt install -y python3 python3-pip python3-venv python3-dev build-essential libxml2-dev libxslt1-dev libffi-dev libpq-dev libssl-dev zlib1g-dev
-    ```
-
-=== "CentOS"
-
-    ```no-highlight
-    sudo yum install -y gcc libxml2-devel libxslt-devel libffi-devel libpq-devel openssl-devel redhat-rpm-config
-    ```
+```no-highlight
+sudo apt install -y python3 python3-pip python3-venv python3-dev \
+build-essential libxml2-dev libxslt1-dev libffi-dev libpq-dev \
+libssl-dev zlib1g-dev
+```
 
 Before continuing, check that your installed Python version is at least 3.10:
 
@@ -55,17 +49,9 @@ cd /opt/netbox/
 
 If `git` is not already installed, install it:
 
-=== "Ubuntu"
-
-    ```no-highlight
-    sudo apt install -y git
-    ```
-
-=== "CentOS"
-
-    ```no-highlight
-    sudo yum install -y git
-    ```
+```no-highlight
+sudo apt install -y git
+```
 
 Next, clone the git repository:
 
@@ -97,24 +83,12 @@ Using this installation method enables easy upgrades in the future by simply che
 
 Create a system user account named `netbox`. We'll configure the WSGI and HTTP services to run under this account. We'll also assign this user ownership of the media directory. This ensures that NetBox will be able to save uploaded files.
 
-=== "Ubuntu"
-
-    ```
-    sudo adduser --system --group netbox
-    sudo chown --recursive netbox /opt/netbox/netbox/media/
-    sudo chown --recursive netbox /opt/netbox/netbox/reports/
-    sudo chown --recursive netbox /opt/netbox/netbox/scripts/
-    ```
-
-=== "CentOS"
-
-    ```
-    sudo groupadd --system netbox
-    sudo adduser --system -g netbox netbox
-    sudo chown --recursive netbox /opt/netbox/netbox/media/
-    sudo chown --recursive netbox /opt/netbox/netbox/reports/
-    sudo chown --recursive netbox /opt/netbox/netbox/scripts/
-    ```
+```
+sudo adduser --system --group netbox
+sudo chown --recursive netbox /opt/netbox/netbox/media/
+sudo chown --recursive netbox /opt/netbox/netbox/reports/
+sudo chown --recursive netbox /opt/netbox/netbox/scripts/
+```
 
 ## Configuration
 
@@ -128,13 +102,13 @@ sudo cp configuration_example.py configuration.py
 Open `configuration.py` with your preferred editor to begin configuring NetBox. NetBox offers [many configuration parameters](../configuration/index.md), but only the following four are required for new installations:
 
 * `ALLOWED_HOSTS`
-* `DATABASE`
+* `DATABASES` (or `DATABASE`)
 * `REDIS`
 * `SECRET_KEY`
 
 ### ALLOWED_HOSTS
 
-This is a list of the valid hostnames and IP addresses by which this server can be reached. You must specify at least one name or IP address. (Note that this does not restrict the locations from which NetBox may be accessed: It is merely for [HTTP host header validation](https://docs.djangoproject.com/en/3.0/topics/security/#host-headers-virtual-hosting).)
+This is a list of the valid hostnames and IP addresses by which this server can be reached. You must specify at least one name or IP address. (Note that this does not restrict the locations from which NetBox may be accessed: It is merely for [HTTP host header validation](https://docs.djangoproject.com/en/stable/topics/security/#host-headers-virtual-hosting).)
 
 ```python
 ALLOWED_HOSTS = ['netbox.example.com', '192.0.2.123']
@@ -146,18 +120,22 @@ If you are not yet sure what the domain name and/or IP address of the NetBox ins
 ALLOWED_HOSTS = ['*']
 ```
 
-### DATABASE
+### DATABASES
 
-This parameter holds the database configuration details. You must define the username and password used when you configured PostgreSQL. If the service is running on a remote host, update the `HOST` and `PORT` parameters accordingly. See the [configuration documentation](../configuration/required-parameters.md#database) for more detail on individual parameters.
+This parameter holds the PostgreSQL database configuration details. The default database must be defined; additional databases may be defined as needed e.g. by plugins.
+
+A username and password must be defined for the default database. If the service is running on a remote host, update the `HOST` and `PORT` parameters accordingly. See the [configuration documentation](../configuration/required-parameters.md#databases) for more detail on individual parameters.
 
 ```python
-DATABASE = {
-    'NAME': 'netbox',               # Database name
-    'USER': 'netbox',               # PostgreSQL username
-    'PASSWORD': 'J5brHrAXFLQSif0K', # PostgreSQL password
-    'HOST': 'localhost',            # Database server
-    'PORT': '',                     # Database port (leave blank for default)
-    'CONN_MAX_AGE': 300,            # Max database connection age (seconds)
+DATABASES = {
+    'default': {
+        'NAME': 'netbox',               # Database name
+        'USER': 'netbox',               # PostgreSQL username
+        'PASSWORD': 'J5brHrAXFLQSif0K', # PostgreSQL password
+        'HOST': 'localhost',            # Database server
+        'PORT': '',                     # Database port (leave blank for default)
+        'CONN_MAX_AGE': 300,            # Max database connection age (seconds)
+    }
 }
 ```
 
@@ -207,7 +185,7 @@ All Python packages required by NetBox are listed in `requirements.txt` and will
 
 ### Remote File Storage
 
-By default, NetBox will use the local filesystem to store uploaded files. To use a remote filesystem, install the [`django-storages`](https://django-storages.readthedocs.io/en/stable/) library and configure your [desired storage backend](../configuration/system.md#storage_backend) in `configuration.py`.
+By default, NetBox will use the local filesystem to store uploaded files. To use a remote filesystem, install the [`django-storages`](https://django-storages.readthedocs.io/en/stable/) library and configure your [desired storage backend](../configuration/system.md#storages) in `configuration.py`.
 
 ```no-highlight
 sudo sh -c "echo 'django-storages' >> /opt/netbox/local_requirements.txt"
@@ -246,7 +224,7 @@ Once NetBox has been configured, we're ready to proceed with the actual installa
 
 * Create a Python virtual environment
 * Installs all required Python packages
-* Run database schema migrations
+* Run database schema migrations (skip with `--readonly`)
 * Builds the documentation locally (for offline use)
 * Aggregate static resource files on disk
 
@@ -266,6 +244,9 @@ sudo PYTHON=/usr/bin/python3.10 /opt/netbox/upgrade.sh
 !!! note
     Upon completion, the upgrade script may warn that no existing virtual environment was detected. As this is a new installation, this warning can be safely ignored.
 
+!!! note
+    To run the script on a node connected to a database in read-only mode, include the `--readonly` parameter. This will skip the application of any database migrations.
+
 ## Create a Super User
 
 NetBox does not come with any predefined user accounts. You'll need to create a super user (administrative account) to be able to log into NetBox. First, enter the Python virtual environment created by the upgrade script:
@@ -282,18 +263,6 @@ Next, we'll create a superuser account using the `createsuperuser` Django manage
 cd /opt/netbox/netbox
 python3 manage.py createsuperuser
 ```
-
-## Schedule the Housekeeping Task
-
-NetBox includes a `housekeeping` management command that handles some recurring cleanup tasks, such as clearing out old sessions and expired change records. Although this command may be run manually, it is recommended to configure a scheduled job using the system's `cron` daemon or a similar utility.
-
-A shell script which invokes this command is included at `contrib/netbox-housekeeping.sh`. It can be copied to or linked from your system's daily cron task directory, or included within the crontab directly. (If installing NetBox into a nonstandard path, be sure to update the system paths within this script first.)
-
-```shell
-sudo ln -s /opt/netbox/contrib/netbox-housekeeping.sh /etc/cron.daily/netbox-housekeeping
-```
-
-See the [housekeeping documentation](../administration/housekeeping.md) for further details.
 
 ## Test the Application
 
@@ -320,13 +289,6 @@ Quit the server with CONTROL-C.
 ```
 
 Next, connect to the name or IP of the server (as defined in `ALLOWED_HOSTS`) on port 8000; for example, <http://127.0.0.1:8000/>. You should be greeted with the NetBox home page. Try logging in using the username and password specified when creating a superuser.
-
-!!! note
-    By default RHEL based distros will likely block your testing attempts with firewalld. The development server port can be opened with `firewall-cmd` (add `--permanent` if you want the rule to survive server restarts):
-
-    ```no-highlight
-    firewall-cmd --zone=public --add-port=8000/tcp
-    ```
 
 !!! danger "Not for production use"
     The development server is for development and testing purposes only. It is neither performant nor secure enough for production use. **Do not use it in production.**

@@ -1,6 +1,9 @@
 from django.test import TestCase
 
-from dcim.choices import DeviceFaceChoices, DeviceStatusChoices, InterfaceTypeChoices, InterfaceModeChoices
+from dcim.choices import (
+    DeviceFaceChoices, DeviceStatusChoices, InterfaceModeChoices, InterfaceTypeChoices, PortTypeChoices,
+    PowerOutletStatusChoices,
+)
 from dcim.forms import *
 from dcim.models import *
 from ipam.models import VLAN
@@ -10,6 +13,56 @@ from virtualization.models import Cluster, ClusterGroup, ClusterType
 
 def get_id(model, slug):
     return model.objects.get(slug=slug).id
+
+
+class PowerOutletFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.site = site = Site.objects.create(name='Site 1', slug='site-1')
+        cls.manufacturer = manufacturer = Manufacturer.objects.create(name='Manufacturer 1', slug='manufacturer-1')
+        cls.role = role = DeviceRole.objects.create(
+            name='Device Role 1', slug='device-role-1', color='ff0000'
+        )
+        cls.device_type = device_type = DeviceType.objects.create(
+            manufacturer=manufacturer, model='Device Type 1', slug='device-type-1', u_height=1
+        )
+        cls.rack = rack = Rack.objects.create(name='Rack 1', site=site)
+        cls.device = Device.objects.create(
+            name='Device 1', device_type=device_type, role=role, site=site, rack=rack, position=1
+        )
+
+    def test_status_is_required(self):
+        form = PowerOutletForm(data={
+            'device': self.device,
+            'module': None,
+            'name': 'New Enabled Outlet',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('status', form.errors)
+
+    def test_status_must_be_defined_choice(self):
+        form = PowerOutletForm(data={
+            'device': self.device,
+            'module': None,
+            'name': 'New Enabled Outlet',
+            'status': 'this isn\'t a defined choice',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('status', form.errors)
+        self.assertTrue(form.errors['status'][-1].startswith('Select a valid choice.'))
+
+    def test_status_recognizes_choices(self):
+        for index, choice in enumerate(PowerOutletStatusChoices.CHOICES):
+            form = PowerOutletForm(data={
+                'device': self.device,
+                'module': None,
+                'name': f'New Enabled Outlet {index + 1}',
+                'status': choice[0],
+            })
+            self.assertEqual({}, form.errors)
+            self.assertTrue(form.is_valid())
+            instance = form.save()
+            self.assertEqual(instance.status, choice[0])
 
 
 class DeviceTestCase(TestCase):
@@ -116,6 +169,51 @@ class DeviceTestCase(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn('position', form.errors)
+
+
+class FrontPortTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.device = create_test_device('Panel Device 1')
+        cls.rear_ports = (
+            RearPort(name='RearPort1', device=cls.device, type=PortTypeChoices.TYPE_8P8C),
+            RearPort(name='RearPort2', device=cls.device, type=PortTypeChoices.TYPE_8P8C),
+            RearPort(name='RearPort3', device=cls.device, type=PortTypeChoices.TYPE_8P8C),
+            RearPort(name='RearPort4', device=cls.device, type=PortTypeChoices.TYPE_8P8C),
+        )
+        RearPort.objects.bulk_create(cls.rear_ports)
+
+    def test_front_port_label_count_valid(self):
+        """
+        Test that generating an equal number of names and labels passes form validation.
+        """
+        front_port_data = {
+            'device': self.device.pk,
+            'name': 'FrontPort[1-4]',
+            'label': 'Port[1-4]',
+            'type': PortTypeChoices.TYPE_8P8C,
+            'rear_port': [f'{rear_port.pk}:1' for rear_port in self.rear_ports],
+        }
+        form = FrontPortCreateForm(front_port_data)
+
+        self.assertTrue(form.is_valid())
+
+    def test_front_port_label_count_mismatch(self):
+        """
+        Check that attempting to generate a differing number of names and labels results in a validation error.
+        """
+        bad_front_port_data = {
+            'device': self.device.pk,
+            'name': 'FrontPort[1-4]',
+            'label': 'Port[1-2]',
+            'type': PortTypeChoices.TYPE_8P8C,
+            'rear_port': [f'{rear_port.pk}:1' for rear_port in self.rear_ports],
+        }
+        form = FrontPortCreateForm(bad_front_port_data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('label', form.errors)
 
 
 class InterfaceTestCase(TestCase):

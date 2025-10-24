@@ -6,13 +6,13 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.routers import APIRootView
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet
 from rq import Worker
 
-from core.models import ObjectType
 from extras import filtersets
 from extras.jobs import ScriptJob
 from extras.models import *
@@ -20,7 +20,7 @@ from netbox.api.authentication import IsAuthenticatedOrLoginNotRequired
 from netbox.api.features import SyncedDataMixin
 from netbox.api.metadata import ContentTypeMetadata
 from netbox.api.renderers import TextRenderer
-from netbox.api.viewsets import NetBoxModelViewSet
+from netbox.api.viewsets import BaseViewSet, NetBoxModelViewSet
 from utilities.exceptions import RQWorkerNotRunningException
 from utilities.request import copy_safe_request
 from . import serializers
@@ -131,6 +131,17 @@ class SavedFilterViewSet(NetBoxModelViewSet):
 
 
 #
+# Table Configs
+#
+
+class TableConfigViewSet(NetBoxModelViewSet):
+    metadata_class = ContentTypeMetadata
+    queryset = TableConfig.objects.all()
+    serializer_class = serializers.TableConfigSerializer
+    filterset_class = filtersets.TableConfigFilterSet
+
+
+#
 # Bookmarks
 #
 
@@ -172,6 +183,14 @@ class TagViewSet(NetBoxModelViewSet):
     filterset_class = filtersets.TagFilterSet
 
 
+class TaggedItemViewSet(RetrieveModelMixin, ListModelMixin, BaseViewSet):
+    queryset = TaggedItem.objects.prefetch_related(
+        'content_type', 'content_object', 'tag'
+    ).order_by('tag__weight', 'tag__name')
+    serializer_class = serializers.TaggedItemSerializer
+    filterset_class = filtersets.TaggedItemFilterSet
+
+
 #
 # Image attachments
 #
@@ -197,6 +216,12 @@ class JournalEntryViewSet(NetBoxModelViewSet):
 #
 # Config contexts
 #
+
+class ConfigContextProfileViewSet(SyncedDataMixin, NetBoxModelViewSet):
+    queryset = ConfigContextProfile.objects.all()
+    serializer_class = serializers.ConfigContextProfileSerializer
+    filterset_class = filtersets.ConfigContextProfileFilterSet
+
 
 class ConfigContextViewSet(SyncedDataMixin, NetBoxModelViewSet):
     queryset = ConfigContext.objects.all()
@@ -252,6 +277,7 @@ class ScriptViewSet(ModelViewSet):
             module_name, script_name = pk.split('.', maxsplit=1)
         except ValueError:
             raise Http404
+
         return get_object_or_404(self.queryset, module__file_path=f'{module_name}.py', name=script_name)
 
     def retrieve(self, request, pk):
@@ -293,20 +319,6 @@ class ScriptViewSet(ModelViewSet):
             return Response(serializer.data)
 
         return Response(input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-#
-# Object types
-#
-
-class ObjectTypeViewSet(ReadOnlyModelViewSet):
-    """
-    Read-only list of ObjectTypes.
-    """
-    permission_classes = [IsAuthenticatedOrLoginNotRequired]
-    queryset = ObjectType.objects.order_by('app_label', 'model')
-    serializer_class = serializers.ObjectTypeSerializer
-    filterset_class = filtersets.ObjectTypeFilterSet
 
 
 #

@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import RegexValidator, ValidationError
 from django.db import models
+from django.db.models import F, Func, Value
+from django.db.models.expressions import RawSQL
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
@@ -70,7 +72,7 @@ class CustomFieldManager(models.Manager.from_queryset(RestrictedQuerySet)):
 
 class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='custom_fields',
         help_text=_('The object(s) to which this field applies.')
     )
@@ -82,7 +84,7 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         help_text=_('The type of data this custom field holds')
     )
     related_object_type = models.ForeignKey(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         on_delete=models.PROTECT,
         blank=True,
         null=True,
@@ -172,13 +174,17 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         verbose_name=_('display weight'),
         help_text=_('Fields with higher weights appear lower in a form.')
     )
-    validation_minimum = models.BigIntegerField(
+    validation_minimum = models.DecimalField(
+        max_digits=16,
+        decimal_places=4,
         blank=True,
         null=True,
         verbose_name=_('minimum value'),
         help_text=_('Minimum allowed value (for numeric fields)')
     )
-    validation_maximum = models.BigIntegerField(
+    validation_maximum = models.DecimalField(
+        max_digits=16,
+        decimal_places=4,
         blank=True,
         null=True,
         verbose_name=_('maximum value'),
@@ -281,12 +287,20 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         Populate initial custom field data upon either a) the creation of a new CustomField, or
         b) the assignment of an existing CustomField to new object types.
         """
+        if self.default is None:
+            # We have to convert None to a JSON null for jsonb_set()
+            value = RawSQL("'null'::jsonb", [])
+        else:
+            value = Value(self.default, models.JSONField())
         for ct in content_types:
-            model = ct.model_class()
-            instances = model.objects.exclude(**{'custom_field_data__contains': self.name})
-            for instance in instances:
-                instance.custom_field_data[self.name] = self.default
-            model.objects.bulk_update(instances, ['custom_field_data'], batch_size=100)
+            ct.model_class().objects.update(
+                custom_field_data=Func(
+                    F('custom_field_data'),
+                    Value([self.name]),
+                    value,
+                    function='jsonb_set'
+                )
+            )
 
     def remove_stale_data(self, content_types):
         """
@@ -295,22 +309,27 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         """
         for ct in content_types:
             if model := ct.model_class():
-                instances = model.objects.filter(custom_field_data__has_key=self.name)
-                for instance in instances:
-                    del instance.custom_field_data[self.name]
-                model.objects.bulk_update(instances, ['custom_field_data'], batch_size=100)
+                model.objects.update(
+                    custom_field_data=F('custom_field_data') - self.name
+                )
 
     def rename_object_data(self, old_name, new_name):
         """
-        Called when a CustomField has been renamed. Updates all assigned object data.
+        Called when a CustomField has been renamed. Removes the original key and inserts the new
+        one, copying the value of the old key.
         """
         for ct in self.object_types.all():
-            model = ct.model_class()
-            params = {f'custom_field_data__{old_name}__isnull': False}
-            instances = model.objects.filter(**params)
-            for instance in instances:
-                instance.custom_field_data[new_name] = instance.custom_field_data.pop(old_name)
-            model.objects.bulk_update(instances, ['custom_field_data'], batch_size=100)
+            ct.model_class().objects.update(
+                custom_field_data=Func(
+                    F('custom_field_data') - old_name,
+                    Value([new_name]),
+                    Func(
+                        F('custom_field_data'),
+                        function='jsonb_extract_path_text',
+                        template=f"to_jsonb(%(expressions)s -> '{old_name}')"
+                    ),
+                    function='jsonb_set')
+            )
 
     def clean(self):
         super().clean()
@@ -456,7 +475,7 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
             field = forms.DecimalField(
                 required=required,
                 initial=initial,
-                max_digits=12,
+                max_digits=16,
                 decimal_places=4,
                 min_value=self.validation_minimum,
                 max_value=self.validation_maximum
@@ -519,7 +538,7 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
 
         # JSON
         elif self.type == CustomFieldTypeChoices.TYPE_JSON:
-            field = JSONField(required=required, initial=json.dumps(initial) if initial else None)
+            field = JSONField(required=required, initial=json.dumps(initial) if initial is not None else None)
 
         # Object
         elif self.type == CustomFieldTypeChoices.TYPE_OBJECT:
@@ -532,6 +551,7 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
             }
             if not for_csv_import:
                 kwargs['query_params'] = self.related_object_filter
+                kwargs['selector'] = True
 
             field = field_class(**kwargs)
 
@@ -546,6 +566,7 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
             }
             if not for_csv_import:
                 kwargs['query_params'] = self.related_object_filter
+                kwargs['selector'] = True
 
             field = field_class(**kwargs)
 
@@ -583,11 +604,19 @@ class CustomField(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         kwargs = {
             'field_name': f'custom_field_data__{self.name}'
         }
+        # Native numeric filters will use `isnull` by default for empty lookups, but
+        # JSON fields require `empty` (see bug #20012).
+        if lookup_expr == 'isnull':
+            lookup_expr = 'empty'
         if lookup_expr is not None:
             kwargs['lookup_expr'] = lookup_expr
 
+        # 'Empty' lookup is always a boolean
+        if lookup_expr == 'empty':
+            filter_class = django_filters.BooleanFilter
+
         # Text/URL
-        if self.type in (
+        elif self.type in (
                 CustomFieldTypeChoices.TYPE_TEXT,
                 CustomFieldTypeChoices.TYPE_LONGTEXT,
                 CustomFieldTypeChoices.TYPE_URL,

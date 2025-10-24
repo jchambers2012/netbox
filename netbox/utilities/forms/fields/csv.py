@@ -79,7 +79,8 @@ class CSVModelMultipleChoiceField(forms.ModelMultipleChoiceField):
     }
 
     def clean(self, value):
-        value = value.split(',') if value else []
+        if not isinstance(value, list):
+            value = value.split(',') if value else []
         return super().clean(value)
 
 
@@ -113,6 +114,8 @@ class CSVMultipleContentTypeField(forms.ModelMultipleChoiceField):
 
     # TODO: Improve validation of selected ContentTypes
     def prepare_value(self, value):
+        if not value:
+            return None
         if type(value) is str:
             ct_filter = Q()
             for name in value.split(','):

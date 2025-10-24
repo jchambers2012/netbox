@@ -1,21 +1,11 @@
 {% extends 'generic/object.html' %}
-{% load buttons %}
 {% load helpers %}
 {% load plugins %}
 {% load i18n %}
 
-{% block buttons %}
-  {% if perms.dcim.change_virtualchassis %}
-    {% edit_button object %}
-  {% endif %}
-  {% if perms.dcim.delete_virtualchassis %}
-    {% delete_button object %}
-  {% endif %}
-{% endblock %}
-
 {% block content %}
 <div class="row">
-	<div class="col col-md-4">
+	<div class="col col-12 col-md-4">
     <div class="card">
       <h2 class="card-header">{% trans "Virtual Chassis" %}</h2>
       <table class="table table-hover attr-table">
@@ -47,7 +37,7 @@
     {% include 'inc/panels/custom_fields.html' %}
     {% plugin_left_page object %}
     </div>
-    <div class="col col-md-8">
+    <div class="col col-12 col-md-8">
       <div class="card">
         <h2 class="card-header">
           {% trans "Members" %}

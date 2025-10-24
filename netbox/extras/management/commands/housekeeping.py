@@ -10,12 +10,20 @@ from packaging import version
 
 from core.models import Job, ObjectChange
 from netbox.config import Config
+from utilities.proxy import resolve_proxies
 
 
 class Command(BaseCommand):
-    help = "Perform nightly housekeeping tasks. (This command can be run at any time.)"
+    help = "Perform nightly housekeeping tasks [DEPRECATED]"
 
     def handle(self, *args, **options):
+        self.stdout.write(
+            "Running this command is no longer necessary: All housekeeping tasks\n"
+            "are addressed automatically via NetBox's built-in job scheduler. It\n"
+            "will be removed in a future release.",
+            self.style.WARNING
+        )
+
         config = Config()
 
         # Clear expired authentication sessions (essentially replicating the `clearsessions` command)
@@ -106,7 +114,7 @@ class Command(BaseCommand):
                 response = requests.get(
                     url=settings.RELEASE_CHECK_URL,
                     headers=headers,
-                    proxies=settings.HTTP_PROXIES
+                    proxies=resolve_proxies(url=settings.RELEASE_CHECK_URL)
                 )
                 response.raise_for_status()
 

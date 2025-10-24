@@ -115,7 +115,7 @@ You may also need to set up the yarn packages as shown in the [Web UI Developmen
 Within the `netbox/netbox/` directory, copy `configuration_example.py` to `configuration.py` and update the following parameters:
 
 * `ALLOWED_HOSTS`: This can be set to `['*']` for development purposes
-* `DATABASE`: PostgreSQL database connection parameters
+* `DATABASES`: PostgreSQL database connection parameters
 * `REDIS`: Redis configuration (if different from the defaults)
 * `SECRET_KEY`: Set to a random string (use `generate_secret_key.py` in the parent directory to generate a suitable key)
 * `DEBUG`: Set to `True`
@@ -147,7 +147,7 @@ For UI development you will need to review the [Web UI Development Guide](web-ui
 
 ## Populating Demo Data
 
-Once you have your development environment up and running, it might be helpful to populate some "dummy" data to make interacting with the UI and APIs more convenient. Check out the [netbox-demo-data](https://github.com/netbox-community/netbox-demo-data) repo on GitHub, which houses a collection of sample data that can be easily imported to any new NetBox deployment. (This sample data is used to populate the public demo instance at <https://demo.netbox.dev>.)
+Once you have your development environment up and running, it might be helpful to populate some "dummy" data to make interacting with the UI and APIs more convenient. Check out the [netbox-demo-data](https://github.com/netbox-community/netbox-demo-data) repo on GitHub, which houses a collection of sample data that can be easily imported to any new NetBox deployment. This sample data is used to populate the [public demo instance](https://demo.netbox.dev).
 
 The demo data is provided in JSON format and loaded into an empty database using Django's `loaddata` management command. Consult the demo data repo's `README` file for complete instructions on populating the data.
 

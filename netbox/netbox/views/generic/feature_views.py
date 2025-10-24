@@ -1,7 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
-from django.db import transaction
+from django.db import router, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
@@ -10,15 +10,22 @@ from django.views.generic import View
 from core.models import Job, ObjectChange
 from core.tables import JobTable, ObjectChangeTable
 from extras.forms import JournalEntryForm
-from extras.models import JournalEntry
+from extras.models import ImageAttachment, JournalEntry
 from extras.tables import JournalEntryTable
+from tenancy.models import ContactAssignment
+from tenancy.tables import ContactAssignmentTable
+from tenancy.filtersets import ContactAssignmentFilterSet
+from tenancy.forms import ContactAssignmentFilterForm
 from utilities.permissions import get_permission_for_model
 from utilities.views import ConditionalLoginRequiredMixin, GetReturnURLMixin, ViewTab
 from .base import BaseMultiObjectView
+from .object_views import ObjectChildrenView
 
 __all__ = (
     'BulkSyncDataView',
     'ObjectChangeLogView',
+    'ObjectContactsView',
+    'ObjectImageAttachmentsView',
     'ObjectJobsView',
     'ObjectJournalView',
     'ObjectSyncDataView',
@@ -73,6 +80,41 @@ class ObjectChangeLogView(ConditionalLoginRequiredMixin, View):
         return render(request, 'extras/object_changelog.html', {
             'object': obj,
             'table': objectchanges_table,
+            'base_template': self.base_template,
+            'tab': self.tab,
+        })
+
+
+class ObjectImageAttachmentsView(ConditionalLoginRequiredMixin, View):
+    """
+    Render all images attached to the object as linked thumbnails.
+
+    Attributes:
+        base_template: The name of the template to extend. If not provided, "{app}/{model}.html" will be used.
+    """
+    base_template = None
+    tab = ViewTab(
+        label=_('Images'),
+        badge=lambda obj: obj.images.count(),
+        permission='extras.view_imageattachment',
+        weight=6000
+    )
+
+    def get(self, request, model, **kwargs):
+        obj = get_object_or_404(model.objects.restrict(request.user, 'view'), **kwargs)
+        image_attachments = ImageAttachment.objects.filter(
+            object_type=ContentType.objects.get_for_model(obj),
+            object_id=obj.pk,
+        )
+
+        # Default to using "<app>/<model>.html" as the template, if it exists. Otherwise,
+        # fall back to using base.html.
+        if self.base_template is None:
+            self.base_template = f"{model._meta.app_label}/{model._meta.model_name}.html"
+
+        return render(request, 'extras/object_imageattachments.html', {
+            'object': obj,
+            'image_attachments': image_attachments,
             'base_template': self.base_template,
             'tab': self.tab,
         })
@@ -234,7 +276,7 @@ class BulkSyncDataView(GetReturnURLMixin, BaseMultiObjectView):
             data_file__isnull=False
         )
 
-        with transaction.atomic():
+        with transaction.atomic(using=router.db_for_write(self.queryset.model)):
             for obj in selected_objects:
                 obj.sync(save=True)
 
@@ -244,3 +286,25 @@ class BulkSyncDataView(GetReturnURLMixin, BaseMultiObjectView):
             ))
 
         return redirect(self.get_return_url(request))
+
+
+class ObjectContactsView(ObjectChildrenView):
+    child_model = ContactAssignment
+    table = ContactAssignmentTable
+    filterset = ContactAssignmentFilterSet
+    filterset_form = ContactAssignmentFilterForm
+    template_name = 'tenancy/object_contacts.html'
+    tab = ViewTab(
+        label=_('Contacts'),
+        badge=lambda obj: obj.get_contacts().count(),
+        permission='tenancy.view_contactassignment',
+        weight=5000
+    )
+
+    def dispatch(self, request, *args, **kwargs):
+        model = kwargs.pop('model')
+        self.queryset = model.objects.all()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_children(self, request, parent):
+        return parent.get_contacts().restrict(request.user, 'view').order_by('priority', 'contact', 'role')

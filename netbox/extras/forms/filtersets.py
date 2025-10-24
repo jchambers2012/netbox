@@ -20,6 +20,7 @@ from virtualization.models import Cluster, ClusterGroup, ClusterType
 
 __all__ = (
     'ConfigContextFilterForm',
+    'ConfigContextProfileFilterForm',
     'ConfigTemplateFilterForm',
     'CustomFieldChoiceSetFilterForm',
     'CustomFieldFilterForm',
@@ -31,6 +32,7 @@ __all__ = (
     'LocalConfigContextFilterForm',
     'NotificationGroupFilterForm',
     'SavedFilterFilterForm',
+    'TableConfigFilterForm',
     'TagFilterForm',
     'WebhookFilterForm',
 )
@@ -101,11 +103,11 @@ class CustomFieldFilterForm(SavedFiltersMixin, FilterForm):
             choices=BOOLEAN_WITH_BLANK_CHOICES
         )
     )
-    validation_minimum = forms.IntegerField(
+    validation_minimum = forms.DecimalField(
         label=_('Minimum value'),
         required=False
     )
-    validation_maximum = forms.IntegerField(
+    validation_maximum = forms.DecimalField(
         label=_('Maximum value'),
         required=False
     )
@@ -164,9 +166,9 @@ class CustomLinkFilterForm(SavedFiltersMixin, FilterForm):
 class ExportTemplateFilterForm(SavedFiltersMixin, FilterForm):
     model = ExportTemplate
     fieldsets = (
-        FieldSet('q', 'filter_id'),
+        FieldSet('q', 'filter_id', 'object_type_id'),
         FieldSet('data_source_id', 'data_file_id', name=_('Data')),
-        FieldSet('object_type_id', 'mime_type', 'file_extension', 'as_attachment', name=_('Attributes')),
+        FieldSet('mime_type', 'file_name', 'file_extension', 'as_attachment', name=_('Rendering')),
     )
     data_source_id = DynamicModelMultipleChoiceField(
         queryset=DataSource.objects.all(),
@@ -189,6 +191,10 @@ class ExportTemplateFilterForm(SavedFiltersMixin, FilterForm):
     mime_type = forms.CharField(
         required=False,
         label=_('MIME type')
+    )
+    file_name = forms.CharField(
+        label=_('File name'),
+        required=False
     )
     file_extension = forms.CharField(
         label=_('File extension'),
@@ -227,6 +233,36 @@ class SavedFilterFilterForm(SavedFiltersMixin, FilterForm):
         FieldSet('object_type', 'enabled', 'shared', 'weight', name=_('Attributes')),
     )
     object_type = ContentTypeMultipleChoiceField(
+        label=_('Object types'),
+        queryset=ObjectType.objects.public(),
+        required=False
+    )
+    enabled = forms.NullBooleanField(
+        label=_('Enabled'),
+        required=False,
+        widget=forms.Select(
+            choices=BOOLEAN_WITH_BLANK_CHOICES
+        )
+    )
+    shared = forms.NullBooleanField(
+        label=_('Shared'),
+        required=False,
+        widget=forms.Select(
+            choices=BOOLEAN_WITH_BLANK_CHOICES
+        )
+    )
+    weight = forms.IntegerField(
+        label=_('Weight'),
+        required=False
+    )
+
+
+class TableConfigFilterForm(SavedFiltersMixin, FilterForm):
+    fieldsets = (
+        FieldSet('q', 'filter_id'),
+        FieldSet('object_type_id', 'enabled', 'shared', 'weight', name=_('Attributes')),
+    )
+    object_type_id = ContentTypeMultipleChoiceField(
         label=_('Object types'),
         queryset=ObjectType.objects.public(),
         required=False
@@ -319,15 +355,42 @@ class TagFilterForm(SavedFiltersMixin, FilterForm):
     )
 
 
+class ConfigContextProfileFilterForm(SavedFiltersMixin, FilterForm):
+    model = ConfigContextProfile
+    fieldsets = (
+        FieldSet('q', 'filter_id'),
+        FieldSet('data_source_id', 'data_file_id', name=_('Data')),
+    )
+    data_source_id = DynamicModelMultipleChoiceField(
+        queryset=DataSource.objects.all(),
+        required=False,
+        label=_('Data source')
+    )
+    data_file_id = DynamicModelMultipleChoiceField(
+        queryset=DataFile.objects.all(),
+        required=False,
+        label=_('Data file'),
+        query_params={
+            'source_id': '$data_source_id'
+        }
+    )
+
+
 class ConfigContextFilterForm(SavedFiltersMixin, FilterForm):
     model = ConfigContext
     fieldsets = (
         FieldSet('q', 'filter_id', 'tag_id'),
+        FieldSet('profile', name=_('Config Context')),
         FieldSet('data_source_id', 'data_file_id', name=_('Data')),
         FieldSet('region_id', 'site_group_id', 'site_id', 'location_id', name=_('Location')),
-        FieldSet('device_type_id', 'platform_id', 'role_id', name=_('Device')),
+        FieldSet('device_type_id', 'platform_id', 'device_role_id', name=_('Device')),
         FieldSet('cluster_type_id', 'cluster_group_id', 'cluster_id', name=_('Cluster')),
         FieldSet('tenant_group_id', 'tenant_id', name=_('Tenant'))
+    )
+    profile_id = DynamicModelMultipleChoiceField(
+        queryset=ConfigContextProfile.objects.all(),
+        required=False,
+        label=_('Profile')
     )
     data_source_id = DynamicModelMultipleChoiceField(
         queryset=DataSource.objects.all(),
@@ -367,7 +430,7 @@ class ConfigContextFilterForm(SavedFiltersMixin, FilterForm):
         required=False,
         label=_('Device types')
     )
-    role_id = DynamicModelMultipleChoiceField(
+    device_role_id = DynamicModelMultipleChoiceField(
         queryset=DeviceRole.objects.all(),
         required=False,
         label=_('Roles')
@@ -414,6 +477,7 @@ class ConfigTemplateFilterForm(SavedFiltersMixin, FilterForm):
     fieldsets = (
         FieldSet('q', 'filter_id', 'tag'),
         FieldSet('data_source_id', 'data_file_id', name=_('Data')),
+        FieldSet('mime_type', 'file_name', 'file_extension', 'as_attachment', name=_('Rendering'))
     )
     data_source_id = DynamicModelMultipleChoiceField(
         queryset=DataSource.objects.all(),
@@ -429,6 +493,25 @@ class ConfigTemplateFilterForm(SavedFiltersMixin, FilterForm):
         }
     )
     tag = TagFilterField(ConfigTemplate)
+    mime_type = forms.CharField(
+        required=False,
+        label=_('MIME type')
+    )
+    file_name = forms.CharField(
+        label=_('File name'),
+        required=False
+    )
+    file_extension = forms.CharField(
+        label=_('File extension'),
+        required=False
+    )
+    as_attachment = forms.NullBooleanField(
+        label=_('As attachment'),
+        required=False,
+        widget=forms.Select(
+            choices=BOOLEAN_WITH_BLANK_CHOICES
+        )
+    )
 
 
 class LocalConfigContextFilterForm(forms.Form):

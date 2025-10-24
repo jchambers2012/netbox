@@ -69,11 +69,14 @@ class PowerPortBulkCreateForm(
 
 
 class PowerOutletBulkCreateForm(
-    form_from_model(PowerOutlet, ['type', 'color', 'feed_leg', 'mark_connected']),
+    form_from_model(PowerOutlet, ['type', 'status', 'color', 'feed_leg', 'mark_connected']),
     DeviceBulkAddComponentForm
 ):
     model = PowerOutlet
-    field_order = ('name', 'label', 'type', 'feed_leg', 'description', 'tags')
+    field_order = (
+        'name', 'label', 'type', 'status', 'color', 'feed_leg', 'mark_connected',
+        'description', 'tags',
+    )
 
 
 class InterfaceBulkCreateForm(
@@ -121,11 +124,11 @@ class DeviceBayBulkCreateForm(DeviceBulkAddComponentForm):
 
 
 class InventoryItemBulkCreateForm(
-    form_from_model(InventoryItem, ['role', 'manufacturer', 'part_id', 'serial', 'asset_tag', 'discovered']),
+    form_from_model(InventoryItem, ['status', 'role', 'manufacturer', 'part_id', 'serial', 'asset_tag', 'discovered']),
     DeviceBulkAddComponentForm
 ):
     model = InventoryItem
     field_order = (
-        'name', 'label', 'role', 'manufacturer', 'part_id', 'serial', 'asset_tag', 'discovered',
+        'name', 'label', 'status', 'role', 'manufacturer', 'part_id', 'serial', 'asset_tag', 'discovered',
         'description', 'tags',
     )

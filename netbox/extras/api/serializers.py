@@ -1,4 +1,3 @@
-from .serializers_.objecttypes import *
 from .serializers_.attachments import *
 from .serializers_.bookmarks import *
 from .serializers_.customfields import *
@@ -12,4 +11,5 @@ from .serializers_.configcontexts import *
 from .serializers_.configtemplates import *
 from .serializers_.savedfilters import *
 from .serializers_.scripts import *
+from .serializers_.tableconfigs import *
 from .serializers_.tags import *

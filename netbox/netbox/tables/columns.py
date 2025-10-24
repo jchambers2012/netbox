@@ -21,7 +21,7 @@ from extras.choices import CustomFieldTypeChoices
 from utilities.object_types import object_type_identifier, object_type_name
 from utilities.permissions import get_permission_for_model
 from utilities.templatetags.builtins.filters import render_markdown
-from utilities.views import get_viewname
+from utilities.views import get_action_url
 
 __all__ = (
     'ActionsColumn',
@@ -35,6 +35,7 @@ __all__ = (
     'ContentTypesColumn',
     'CustomFieldColumn',
     'CustomLinkColumn',
+    'DictColumn',
     'DistanceColumn',
     'DurationColumn',
     'LinkedCountColumn',
@@ -236,7 +237,11 @@ class ActionsColumn(tables.Column):
     :param split_actions: When True, converts the actions dropdown menu into a split button with first action as the
         direct button link and icon (default: True)
     """
-    attrs = {'td': {'class': 'text-end text-nowrap noprint'}}
+    attrs = {
+        'td': {
+            'class': 'text-end text-nowrap noprint p-1'
+        }
+    }
     empty_values = ()
     actions = {
         'edit': ActionsItem('Edit', 'pencil', 'change', 'warning'),
@@ -259,11 +264,15 @@ class ActionsColumn(tables.Column):
         return ''
 
     def render(self, record, table, **kwargs):
-        # Skip dummy records (e.g. available VLANs) or those with no actions
-        if not getattr(record, 'pk', None) or not (self.actions or self.extra_buttons):
+        model = table.Meta.model
+
+        # Skip if no actions or extra buttons are defined
+        if not (self.actions or self.extra_buttons):
+            return ''
+        # Skip dummy records (e.g. available VLANs or IP ranges replacing individual IPs)
+        if type(record) is not model or not getattr(record, 'pk', None):
             return ''
 
-        model = table.Meta.model
         if request := getattr(table, 'context', {}).get('request'):
             return_url = request.GET.get('return_url', request.get_full_path())
             url_appendix = f'?return_url={quote(return_url)}'
@@ -280,7 +289,7 @@ class ActionsColumn(tables.Column):
         for idx, (action, attrs) in enumerate(self.actions.items()):
             permission = get_permission_for_model(model, attrs.permission)
             if attrs.permission is None or user.has_perm(permission):
-                url = reverse(get_viewname(model, action), kwargs={'pk': record.pk})
+                url = get_action_url(model, action=action, kwargs={'pk': record.pk})
 
                 # Render a separate button if a) only one action exists, or b) if split_actions is True
                 if len(self.actions) == 1 or (self.split_actions and idx == 0):
@@ -707,3 +716,14 @@ class DistanceColumn(TemplateColumn):
 
     def __init__(self, template_code=template_code, order_by='_abs_distance', **kwargs):
         super().__init__(template_code=template_code, order_by=order_by, **kwargs)
+
+
+class DictColumn(tables.Column):
+    """
+    Render a dictionary of data in a simple key: value format, one pair per line.
+    """
+    def render(self, value):
+        output = '<br />'.join([
+            f'{escape(k)}: {escape(v)}' for k, v in value.items()
+        ])
+        return mark_safe(output)

@@ -1,6 +1,10 @@
+# Shell text coloring
+# https://github.com/tartley/colorama/blob/master/CHANGELOG.rst
+colorama
+
 # The Python web framework on which NetBox is built
 # https://docs.djangoproject.com/en/stable/releases/
-Django<5.2
+Django==5.2.*
 
 # Django middleware which permits cross-domain API requests
 # https://github.com/adamchainz/django-cors-headers/blob/main/CHANGELOG.rst
@@ -8,14 +12,17 @@ django-cors-headers
 
 # Runtime UI tool for debugging Django
 # https://github.com/jazzband/django-debug-toolbar/blob/main/docs/changes.rst
-# See: https://django-debug-toolbar.readthedocs.io/en/latest/changes.html#id1
-# "Wrap SHOW_TOOLBAR_CALLBACK function with sync_to_async or async_to_sync to allow sync/async
-# compatibility." breaks stawberry-graphql-django at version 0.52.0 (current)
-django-debug-toolbar==5.0.1
+# django-debug-toolbar v6.0.0 raises "Attribute Error at /: 'function' object has no attribute 'set'" 
+# see https://github.com/netbox-community/netbox/issues/19974
+django-debug-toolbar==5.2.0
 
 # Library for writing reusable URL query filters
 # https://github.com/carltongibson/django-filter/blob/main/CHANGES.rst
 django-filter
+
+# Django Debug Toolbar extension for GraphiQL
+# https://github.com/flavors/django-graphiql-debug-toolbar/blob/main/CHANGES.rst
+django-graphiql-debug-toolbar
 
 # HTMX utilities for Django
 # https://django-htmx.readthedocs.io/en/latest/changelog.html
@@ -44,6 +51,10 @@ django-rich
 # Django integration for RQ (Reqis queuing)
 # https://github.com/rq/django-rq/blob/master/CHANGELOG.md
 django-rq
+
+# Provides a variety of storage backends
+# https://github.com/jschneier/django-storages/blob/master/CHANGELOG.rst
+django-storages
 
 # Abstraction models for rendering and paginating HTML tables
 # https://github.com/jieter/django-tables2/blob/master/CHANGELOG.md
@@ -81,6 +92,10 @@ gunicorn
 # https://jinja.palletsprojects.com/changes/
 Jinja2
 
+# JSON schema validation
+# https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst
+jsonschema
+
 # Simple markup language for rendering HTML
 # https://python-markdown.github.io/changelog/
 Markdown
@@ -91,7 +106,11 @@ mkdocs-material
 
 # Introspection for embedded code
 # https://github.com/mkdocstrings/mkdocstrings/blob/main/CHANGELOG.md
-mkdocstrings[python]
+mkdocstrings
+
+# Python handler for mkdocstrings
+# https://github.com/mkdocstrings/python/blob/main/CHANGELOG.md
+mkdocstrings-python
 
 # Library for manipulating IP prefixes and addresses
 # https://github.com/netaddr/netaddr/blob/master/CHANGELOG.rst
@@ -103,6 +122,7 @@ nh3
 
 # Fork of PIL (Python Imaging Library) for image processing
 # https://github.com/python-pillow/Pillow/releases
+# https://pillow.readthedocs.io/en/stable/releasenotes/
 Pillow
 
 # PostgreSQL database adapter for Python
@@ -121,13 +141,17 @@ requests
 # https://github.com/rq/rq/blob/master/CHANGES.md
 rq
 
+# Django app for social-auth-core
+# https://github.com/python-social-auth/social-app-django/blob/master/CHANGELOG.md
+social-auth-app-django
+
 # Social authentication framework
 # https://github.com/python-social-auth/social-core/blob/master/CHANGELOG.md
 social-auth-core
 
-# Django app for social-auth-core
-# https://github.com/python-social-auth/social-app-django/blob/master/CHANGELOG.md
-social-auth-app-django
+# Image thumbnail generation
+# https://github.com/jazzband/sorl-thumbnail/blob/master/CHANGES.rst
+sorl-thumbnail
 
 # Strawberry GraphQL
 # https://github.com/strawberry-graphql/strawberry/blob/main/CHANGELOG.md
@@ -135,8 +159,7 @@ strawberry-graphql
 
 # Strawberry GraphQL Django extension
 # https://github.com/strawberry-graphql/strawberry-django/releases
-# Pinned to v0.52.0 for suspected upstream bug; see #18329
-strawberry-graphql-django==0.52.0
+strawberry-graphql-django
 
 # SVG image rendering (used for rack elevations)
 # https://github.com/mozman/svgwrite/blob/master/NEWS.rst

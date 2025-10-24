@@ -4,6 +4,9 @@ from extras.choices import LogLevelChoices
 # Custom fields
 CUSTOMFIELD_EMPTY_VALUES = (None, '', [])
 
+# Template Export
+DEFAULT_MIME_TYPE = 'text/plain; charset=utf-8'
+
 # Webhooks
 HTTP_CONTENT_TYPE_JSON = 'application/json'
 
@@ -17,6 +20,12 @@ WEBHOOK_EVENT_TYPES = {
     JOB_FAILED: 'job_ended',
     JOB_ERRORED: 'job_ended',
 }
+
+# Jinja environment parameters which support path imports
+JINJA_ENV_PARAMS_WITH_PATH_IMPORT = (
+    'undefined',
+    'finalize',
+)
 
 # Dashboard
 DEFAULT_DASHBOARD = [

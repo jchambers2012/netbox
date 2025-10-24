@@ -9,6 +9,7 @@ from netbox.choices import ColorChoices
 from netbox.models import ChangeLoggedModel
 from netbox.models.features import CloningMixin, ExportTemplatesMixin
 from utilities.fields import ColorField
+from utilities.querysets import RestrictedQuerySet
 
 __all__ = (
     'Tag',
@@ -34,10 +35,14 @@ class Tag(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel, TagBase):
         blank=True,
     )
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='+',
         blank=True,
         help_text=_("The object type(s) to which this tag can be applied.")
+    )
+    weight = models.PositiveSmallIntegerField(
+        verbose_name=_('weight'),
+        default=1000,
     )
 
     clone_fields = (
@@ -45,7 +50,7 @@ class Tag(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel, TagBase):
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ('weight', 'name')
         verbose_name = _('tag')
         verbose_name_plural = _('tags')
 
@@ -72,8 +77,12 @@ class TaggedItem(GenericTaggedItemBase):
     )
 
     _netbox_private = True
+    objects = RestrictedQuerySet.as_manager()
 
     class Meta:
         indexes = [models.Index(fields=["content_type", "object_id"])]
         verbose_name = _('tagged item')
         verbose_name_plural = _('tagged items')
+        # Note: while there is no ordering applied here (because it would basically be done on fields
+        # of the related `tag`), there is an ordering applied to extras.api.views.TaggedItemViewSet
+        # to allow for proper pagination.

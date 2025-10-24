@@ -65,6 +65,29 @@ class ComponentModel(NetBoxModel):
         blank=True
     )
 
+    # Denormalized references replicated from the parent Device
+    _site = models.ForeignKey(
+        to='dcim.Site',
+        on_delete=models.SET_NULL,
+        related_name='+',
+        blank=True,
+        null=True,
+    )
+    _location = models.ForeignKey(
+        to='dcim.Location',
+        on_delete=models.SET_NULL,
+        related_name='+',
+        blank=True,
+        null=True,
+    )
+    _rack = models.ForeignKey(
+        to='dcim.Rack',
+        on_delete=models.SET_NULL,
+        related_name='+',
+        blank=True,
+        null=True,
+    )
+
     class Meta:
         abstract = True
         ordering = ('device', 'name')
@@ -99,6 +122,14 @@ class ComponentModel(NetBoxModel):
             raise ValidationError({
                 "device": _("Components cannot be moved to a different device.")
             })
+
+    def save(self, *args, **kwargs):
+        # Save denormalized references
+        self._site = self.device.site
+        self._location = self.device.location
+        self._rack = self.device.rack
+
+        super().save(*args, **kwargs)
 
     @property
     def parent_object(self):
@@ -452,6 +483,12 @@ class PowerOutlet(ModularComponentModel, CabledObjectModel, PathEndpoint, Tracki
     """
     A physical power outlet (output) within a Device which provides power to a PowerPort.
     """
+    status = models.CharField(
+        verbose_name=_('status'),
+        max_length=50,
+        choices=PowerOutletStatusChoices,
+        default=PowerOutletStatusChoices.STATUS_ENABLED
+    )
     type = models.CharField(
         verbose_name=_('type'),
         max_length=50,
@@ -494,6 +531,9 @@ class PowerOutlet(ModularComponentModel, CabledObjectModel, PathEndpoint, Tracki
             raise ValidationError(
                 _("Parent power port ({power_port}) must belong to the same device").format(power_port=self.power_port)
             )
+
+    def get_status_color(self):
+        return PowerOutletStatusChoices.colors.get(self.status)
 
 
 #
@@ -710,10 +750,13 @@ class Interface(ModularComponentModel, BaseInterface, CabledObjectModel, PathEnd
         verbose_name=('channel width (MHz)'),
         help_text=_("Populated by selected channel (if set)")
     )
-    tx_power = models.PositiveSmallIntegerField(
+    tx_power = models.SmallIntegerField(
         blank=True,
         null=True,
-        validators=(MaxValueValidator(127),),
+        validators=(
+            MinValueValidator(-40),
+            MaxValueValidator(127),
+        ),
         verbose_name=_('transmit power (dBm)')
     )
     poe_mode = models.CharField(
@@ -829,14 +872,14 @@ class Interface(ModularComponentModel, BaseInterface, CabledObjectModel, PathEnd
                         "The selected parent interface ({interface}) belongs to a different device ({device})"
                     ).format(interface=self.parent, device=self.parent.device)
                 })
-            elif self.parent.device.virtual_chassis != self.parent.virtual_chassis:
+            elif self.parent.device.virtual_chassis != self.device.virtual_chassis:
                 raise ValidationError({
                     'parent': _(
                         "The selected parent interface ({interface}) belongs to {device}, which is not part of "
                         "virtual chassis {virtual_chassis}."
                     ).format(
                         interface=self.parent,
-                        device=self.parent_device,
+                        device=self.parent.device,
                         virtual_chassis=self.device.virtual_chassis
                     )
                 })
@@ -847,7 +890,7 @@ class Interface(ModularComponentModel, BaseInterface, CabledObjectModel, PathEnd
         if self.pk and self.bridge_id == self.pk:
             raise ValidationError({'bridge': _("An interface cannot be bridged to itself.")})
 
-        # A bridged interface belong to the same device or virtual chassis
+        # A bridged interface belongs to the same device or virtual chassis
         if self.bridge and self.bridge.device != self.device:
             if self.device.virtual_chassis is None:
                 raise ValidationError({
@@ -1268,7 +1311,6 @@ class InventoryItem(MPTTModel, ComponentModel, TrackingModelMixin):
     )
     component_type = models.ForeignKey(
         to='contenttypes.ContentType',
-        limit_choices_to=MODULAR_COMPONENT_MODELS,
         on_delete=models.PROTECT,
         related_name='+',
         blank=True,

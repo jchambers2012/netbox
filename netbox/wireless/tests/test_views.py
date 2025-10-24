@@ -16,7 +16,9 @@ class WirelessLANGroupTestCase(ViewTestCases.OrganizationalObjectViewTestCase):
 
         groups = (
             WirelessLANGroup(name='Wireless LAN Group 1', slug='wireless-lan-group-1'),
-            WirelessLANGroup(name='Wireless LAN Group 2', slug='wireless-lan-group-2'),
+            WirelessLANGroup(
+                name='Wireless LAN Group 2', slug='wireless-lan-group-2', comments='LAN Group 2 comment',
+            ),
             WirelessLANGroup(name='Wireless LAN Group 3', slug='wireless-lan-group-3'),
         )
         for group in groups:
@@ -30,24 +32,26 @@ class WirelessLANGroupTestCase(ViewTestCases.OrganizationalObjectViewTestCase):
             'parent': groups[2].pk,
             'description': 'A new wireless LAN group',
             'tags': [t.pk for t in tags],
+            'comments': 'LAN Group X comment',
         }
 
         cls.csv_data = (
-            "name,slug,description",
-            "Wireless LAN Group 4,wireless-lan-group-4,Fourth wireless LAN group",
-            "Wireless LAN Group 5,wireless-lan-group-5,Fifth wireless LAN group",
-            "Wireless LAN Group 6,wireless-lan-group-6,Sixth wireless LAN group",
+            "name,slug,description,comments",
+            "Wireless LAN Group 4,wireless-lan-group-4,Fourth wireless LAN group,",
+            "Wireless LAN Group 5,wireless-lan-group-5,Fifth wireless LAN group,",
+            "Wireless LAN Group 6,wireless-lan-group-6,Sixth wireless LAN group,LAN Group 6 comment",
         )
 
         cls.csv_update_data = (
-            "id,name,description",
-            f"{groups[0].pk},Wireless LAN Group 7,Fourth wireless LAN group7",
-            f"{groups[1].pk},Wireless LAN Group 8,Fifth wireless LAN group8",
-            f"{groups[2].pk},Wireless LAN Group 0,Sixth wireless LAN group9",
+            "id,name,description,comments",
+            f"{groups[0].pk},Wireless LAN Group 7,Fourth wireless LAN group7,Group 7 comment",
+            f"{groups[1].pk},Wireless LAN Group 8,Fifth wireless LAN group8,",
+            f"{groups[2].pk},Wireless LAN Group 0,Sixth wireless LAN group9,",
         )
 
         cls.bulk_edit_data = {
             'description': 'New description',
+            'comments': 'New Comments',
         }
 
 
@@ -194,10 +198,10 @@ class WirelessLinkTestCase(ViewTestCases.PrimaryObjectViewTestCase):
         }
 
         cls.csv_data = (
-            "interface_a,interface_b,status,tenant",
-            f"{interfaces[6].pk},{interfaces[7].pk},connected,{tenants[0].name}",
-            f"{interfaces[8].pk},{interfaces[9].pk},connected,{tenants[1].name}",
-            f"{interfaces[10].pk},{interfaces[11].pk},connected,{tenants[2].name}",
+            "device_a,interface_a,device_b,interface_b,status,tenant",
+            f"{interfaces[6].device.name},{interfaces[6].name},{interfaces[7].device.name},{interfaces[7].name},connected,{tenants[0].name}",
+            f"{interfaces[8].device.name},{interfaces[8].name},{interfaces[9].device.name},{interfaces[9].name},connected,{tenants[1].name}",
+            f"{interfaces[10].device.name},{interfaces[10].name},{interfaces[11].device.name},{interfaces[11].name},connected,{tenants[2].name}",
         )
 
         cls.csv_update_data = (

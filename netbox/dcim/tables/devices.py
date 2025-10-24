@@ -59,9 +59,13 @@ MACADDRESS_COPY_BUTTON = """
 #
 
 class DeviceRoleTable(NetBoxTable):
-    name = tables.Column(
+    name = columns.MPTTColumn(
         verbose_name=_('Name'),
         linkify=True
+    )
+    parent = tables.Column(
+        verbose_name=_('Parent'),
+        linkify=True,
     )
     device_count = columns.LinkedCountColumn(
         viewname='dcim:device_list',
@@ -88,8 +92,8 @@ class DeviceRoleTable(NetBoxTable):
     class Meta(NetBoxTable.Meta):
         model = models.DeviceRole
         fields = (
-            'pk', 'id', 'name', 'device_count', 'vm_count', 'color', 'vm_role', 'config_template', 'description',
-            'slug', 'tags', 'actions', 'created', 'last_updated',
+            'pk', 'id', 'name', 'parent', 'device_count', 'vm_count', 'color', 'vm_role', 'config_template',
+            'description', 'slug', 'tags', 'actions', 'created', 'last_updated',
         )
         default_columns = ('pk', 'name', 'device_count', 'vm_count', 'color', 'vm_role', 'description')
 
@@ -99,9 +103,13 @@ class DeviceRoleTable(NetBoxTable):
 #
 
 class PlatformTable(NetBoxTable):
-    name = tables.Column(
+    name = columns.MPTTColumn(
         verbose_name=_('Name'),
         linkify=True
+    )
+    parent = tables.Column(
+        verbose_name=_('Parent'),
+        linkify=True,
     )
     manufacturer = tables.Column(
         verbose_name=_('Manufacturer'),
@@ -128,8 +136,8 @@ class PlatformTable(NetBoxTable):
     class Meta(NetBoxTable.Meta):
         model = models.Platform
         fields = (
-            'pk', 'id', 'name', 'manufacturer', 'device_count', 'vm_count', 'slug', 'config_template', 'description',
-            'tags', 'actions', 'created', 'last_updated',
+            'pk', 'id', 'name', 'parent', 'manufacturer', 'device_count', 'vm_count', 'slug', 'config_template',
+            'description', 'tags', 'actions', 'created', 'last_updated',
         )
         default_columns = (
             'pk', 'name', 'manufacturer', 'device_count', 'vm_count', 'description',
@@ -186,6 +194,11 @@ class DeviceTable(TenancyColumnsMixin, ContactsColumnMixin, NetBoxTable):
     device_type = tables.Column(
         linkify=True,
         verbose_name=_('Type')
+    )
+    u_height = columns.TemplateColumn(
+        accessor=tables.A('device_type.u_height'),
+        verbose_name=_('U Height'),
+        template_code='{{ value|floatformat }}'
     )
     platform = tables.Column(
         linkify=True,
@@ -520,6 +533,9 @@ class PowerOutletTable(ModularDeviceComponentTable, PathEndpointTable):
         verbose_name=_('Power Port'),
         linkify=True
     )
+    status = columns.ChoiceFieldColumn(
+        verbose_name=_('Status'),
+    )
     color = columns.ColorColumn()
     tags = columns.TagColumn(
         url_name='dcim:poweroutlet_list'
@@ -530,9 +546,11 @@ class PowerOutletTable(ModularDeviceComponentTable, PathEndpointTable):
         fields = (
             'pk', 'id', 'name', 'device', 'module_bay', 'module', 'label', 'type', 'description', 'power_port',
             'color', 'feed_leg', 'mark_connected', 'cable', 'cable_color', 'link_peer', 'connection', 'inventory_items',
-            'tags', 'created', 'last_updated',
+            'tags', 'created', 'last_updated', 'status',
         )
-        default_columns = ('pk', 'name', 'device', 'label', 'type', 'color', 'power_port', 'feed_leg', 'description')
+        default_columns = (
+            'pk', 'name', 'device', 'label', 'type', 'status', 'color', 'power_port', 'feed_leg', 'description',
+        )
 
 
 class DevicePowerOutletTable(PowerOutletTable):
@@ -550,9 +568,11 @@ class DevicePowerOutletTable(PowerOutletTable):
         fields = (
             'pk', 'id', 'name', 'module_bay', 'module', 'label', 'type', 'color', 'power_port', 'feed_leg',
             'description', 'mark_connected', 'cable', 'cable_color', 'link_peer', 'connection', 'tags', 'actions',
+            'status',
         )
         default_columns = (
-            'pk', 'name', 'label', 'type', 'color', 'power_port', 'feed_leg', 'description', 'cable', 'connection',
+            'pk', 'name', 'label', 'type', 'status', 'color', 'power_port', 'feed_leg', 'description', 'cable',
+            'connection',
         )
 
 
@@ -1084,10 +1104,9 @@ class VirtualDeviceContextTable(TenancyColumnsMixin, NetBoxTable):
         verbose_name=_('Name'),
         linkify=True
     )
-    device = tables.TemplateColumn(
+    device = tables.Column(
         verbose_name=_('Device'),
         order_by=('device___name',),
-        template_code=DEVICE_LINK,
         linkify=True
     )
     status = columns.ChoiceFieldColumn(

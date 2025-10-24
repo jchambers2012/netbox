@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth import password_validation
@@ -13,9 +15,13 @@ from netbox.preferences import PREFERENCES
 from users.constants import *
 from users.models import *
 from utilities.data import flatten_dict
-from utilities.forms.fields import ContentTypeMultipleChoiceField, DynamicModelMultipleChoiceField
+from utilities.forms.fields import (
+    ContentTypeMultipleChoiceField,
+    DynamicModelMultipleChoiceField,
+    JSONField,
+)
 from utilities.forms.rendering import FieldSet
-from utilities.forms.widgets import DateTimePicker
+from utilities.forms.widgets import DateTimePicker, SplitMultiSelectWidget
 from utilities.permissions import qs_filter_from_constraints
 
 __all__ = (
@@ -59,9 +65,10 @@ class UserConfigForm(forms.ModelForm, metaclass=UserConfigFormMetaclass):
     fieldsets = (
         FieldSet(
             'locale.language', 'pagination.per_page', 'pagination.placement', 'ui.htmx_navigation',
+            'ui.tables.striping',
             name=_('User Interface')
         ),
-        FieldSet('data_format', name=_('Miscellaneous')),
+        FieldSet('data_format', 'csv_delimiter', name=_('Miscellaneous')),
     )
     # List of clearable preferences
     pk = forms.MultipleChoiceField(
@@ -271,12 +278,21 @@ class GroupForm(forms.ModelForm):
         return instance
 
 
+def get_object_types_choices():
+    return [
+        (ot.pk, str(ot))
+        for ot in ObjectType.objects.filter(OBJECTPERMISSION_OBJECT_TYPES).order_by('app_label', 'model')
+    ]
+
+
 class ObjectPermissionForm(forms.ModelForm):
     object_types = ContentTypeMultipleChoiceField(
         label=_('Object types'),
         queryset=ObjectType.objects.all(),
-        limit_choices_to=OBJECTPERMISSION_OBJECT_TYPES,
-        widget=forms.SelectMultiple(attrs={'size': 6})
+        widget=SplitMultiSelectWidget(
+            choices=get_object_types_choices
+        ),
+        help_text=_('Select the types of objects to which the permission will appy.')
     )
     can_view = forms.BooleanField(
         required=False
@@ -306,13 +322,22 @@ class ObjectPermissionForm(forms.ModelForm):
         required=False,
         queryset=Group.objects.all()
     )
+    constraints = JSONField(
+        required=False,
+        label=_('Constraints'),
+        help_text=_(
+            'JSON expression of a queryset filter that will return only permitted objects. Leave null '
+            'to match all objects of this type. A list of multiple objects will result in a logical OR '
+            'operation.'
+        ),
+    )
 
     fieldsets = (
         FieldSet('name', 'description', 'enabled'),
         FieldSet('can_view', 'can_add', 'can_change', 'can_delete', 'actions', name=_('Actions')),
         FieldSet('object_types', name=_('Objects')),
         FieldSet('groups', 'users', name=_('Assignment')),
-        FieldSet('constraints', name=_('Constraints'))
+        FieldSet('constraints', name=_('Constraints')),
     )
 
     class Meta:
@@ -320,13 +345,6 @@ class ObjectPermissionForm(forms.ModelForm):
         fields = [
             'name', 'description', 'enabled', 'object_types', 'users', 'groups', 'constraints', 'actions',
         ]
-        help_texts = {
-            'constraints': _(
-                'JSON expression of a queryset filter that will return only permitted objects. Leave null '
-                'to match all objects of this type. A list of multiple objects will result in a logical OR '
-                'operation.'
-            )
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -334,17 +352,31 @@ class ObjectPermissionForm(forms.ModelForm):
         # Make the actions field optional since the form uses it only for non-CRUD actions
         self.fields['actions'].required = False
 
-        # Populate assigned users and groups
+        # Prepare the appropriate fields when editing an existing ObjectPermission
         if self.instance.pk:
+            # Populate assigned users and groups
             self.fields['groups'].initial = self.instance.groups.values_list('id', flat=True)
             self.fields['users'].initial = self.instance.users.values_list('id', flat=True)
 
-        # Check the appropriate checkboxes when editing an existing ObjectPermission
-        if self.instance.pk:
+            # Check the appropriate checkboxes when editing an existing ObjectPermission
             for action in ['view', 'add', 'change', 'delete']:
                 if action in self.instance.actions:
                     self.fields[f'can_{action}'].initial = True
                     self.instance.actions.remove(action)
+
+        # Populate initial data for a new ObjectPermission
+        elif self.initial:
+            # Handle cloned objects - actions come from initial data (URL parameters)
+            if 'actions' in self.initial:
+                if cloned_actions := self.initial['actions']:
+                    for action in ['view', 'add', 'change', 'delete']:
+                        if action in cloned_actions:
+                            self.fields[f'can_{action}'].initial = True
+                            self.initial['actions'].remove(action)
+            # Convert data delivered via initial data to JSON data
+            if 'constraints' in self.initial:
+                if type(self.initial['constraints']) is str:
+                    self.initial['constraints'] = json.loads(self.initial['constraints'])
 
     def clean(self):
         super().clean()

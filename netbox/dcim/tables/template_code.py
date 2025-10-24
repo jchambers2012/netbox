@@ -64,7 +64,7 @@ INTERFACE_IPADDRESSES = """
 
 INTERFACE_FHRPGROUPS = """
   {% for assignment in value.all %}
-    <a href="{{ assignment.group.get_absolute_url }}">{{ assignment.group.get_protocol_display }}: {{ assignment.group.group_id }}</a>
+    <a href="{{ assignment.group.get_absolute_url }}">{{ assignment.group }}</a>
   {% endfor %}
 """
 
@@ -107,6 +107,11 @@ LOCATION_BUTTONS = """
 <a href="{% url 'dcim:rack_elevation_list' %}?site={{ record.site.slug }}&location_id={{ record.pk }}" class="btn btn-sm btn-primary" title="View elevations">
     <i class="mdi mdi-server"></i>
 </a>
+"""
+
+OUTER_UNIT = """
+{% load helpers %}
+{% if value %}{{ value }} {{ record.outer_unit }}{% endif %}
 """
 
 #
@@ -562,4 +567,8 @@ MODULEBAY_BUTTONS = """
         </a>
     {% endif %}
 {% endif %}
+"""
+
+MODULETYPEPROFILE_ATTRIBUTES = """
+{% if value %}{% for attr in value %}{{ attr }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
 """

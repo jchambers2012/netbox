@@ -18,6 +18,7 @@ from utilities.forms.fields import (
 )
 
 __all__ = (
+    'ConfigContextProfileImportForm',
     'ConfigTemplateImportForm',
     'CustomFieldChoiceSetImportForm',
     'CustomFieldImportForm',
@@ -96,7 +97,7 @@ class CustomFieldChoiceSetImportForm(CSVModelForm):
     class Meta:
         model = CustomFieldChoiceSet
         fields = (
-            'name', 'description', 'extra_choices', 'order_alphabetically',
+            'name', 'description', 'base_choices', 'extra_choices', 'order_alphabetically',
         )
 
     def clean_extra_choices(self):
@@ -144,8 +145,18 @@ class ExportTemplateImportForm(CSVModelForm):
     class Meta:
         model = ExportTemplate
         fields = (
-            'name', 'object_types', 'description', 'mime_type', 'file_extension', 'as_attachment', 'template_code',
+            'name', 'object_types', 'description', 'environment_params', 'mime_type', 'file_name', 'file_extension',
+            'as_attachment', 'template_code',
         )
+
+
+class ConfigContextProfileImportForm(NetBoxModelImportForm):
+
+    class Meta:
+        model = ConfigContextProfile
+        fields = [
+            'name', 'description', 'schema', 'comments', 'tags',
+        ]
 
 
 class ConfigTemplateImportForm(CSVModelForm):
@@ -153,7 +164,8 @@ class ConfigTemplateImportForm(CSVModelForm):
     class Meta:
         model = ConfigTemplate
         fields = (
-            'name', 'description', 'environment_params', 'template_code', 'tags',
+            'name', 'description', 'template_code', 'environment_params', 'mime_type', 'file_name', 'file_extension',
+            'as_attachment', 'tags',
         )
 
 
@@ -232,10 +244,22 @@ class EventRuleImportForm(NetBoxModelImportForm):
 
 class TagImportForm(CSVModelForm):
     slug = SlugField()
+    weight = forms.IntegerField(
+        label=_('Weight'),
+        required=False
+    )
+    object_types = CSVMultipleContentTypeField(
+        label=_('Object types'),
+        queryset=ObjectType.objects.with_feature('tags'),
+        help_text=_("One or more assigned object types"),
+        required=False,
+    )
 
     class Meta:
         model = Tag
-        fields = ('name', 'slug', 'color', 'description')
+        fields = (
+            'name', 'slug', 'color', 'weight', 'description', 'object_types',
+        )
 
 
 class JournalEntryImportForm(NetBoxModelImportForm):

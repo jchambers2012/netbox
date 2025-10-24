@@ -23,6 +23,7 @@ __all__ = (
     'get_serializer_for_model',
     'get_view_name',
     'is_api_request',
+    'is_graphql_request',
 )
 
 
@@ -56,8 +57,14 @@ def is_api_request(request):
     """
     Return True of the request is being made via the REST API.
     """
-    api_path = reverse('api-root')
-    return request.path_info.startswith(api_path) and request.content_type == HTTP_CONTENT_TYPE_JSON
+    return request.path_info.startswith(reverse('api-root'))
+
+
+def is_graphql_request(request):
+    """
+    Return True of the request is being made via the GraphQL API.
+    """
+    return request.path_info == reverse('graphql') and request.content_type == HTTP_CONTENT_TYPE_JSON
 
 
 def get_view_name(view):

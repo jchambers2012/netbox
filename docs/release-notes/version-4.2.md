@@ -1,5 +1,101 @@
 # NetBox v4.2
 
+## v4.2.9 (2025-04-30)
+
+### Enhancements
+
+* [#17151](https://github.com/netbox-community/netbox/issues/17151) - Display circuit type with background color in circuits list
+* [#17319](https://github.com/netbox-community/netbox/issues/17319) - Improve layout of component template edit forms
+* [#17405](https://github.com/netbox-community/netbox/issues/17405) - Display plugin icons in plugins list
+* [#18215](https://github.com/netbox-community/netbox/issues/18215) - Link to script results list from script history
+* [#18334](https://github.com/netbox-community/netbox/issues/18334) - Add region, site group, site, location, and rack filters for modules
+* [#18982](https://github.com/netbox-community/netbox/issues/18982) - Reference rack as related object in changelog records for rack reservations
+* [#18989](https://github.com/netbox-community/netbox/issues/18989) - List virtual circuits under provider view
+* [#19110](https://github.com/netbox-community/netbox/issues/19110) - Enable filtering devices and virtual machines by primary IP address
+* [#19358](https://github.com/netbox-community/netbox/issues/19358) - Move release info from footer to the navigation menu
+
+### Bug Fixes
+
+* [#15739](https://github.com/netbox-community/netbox/issues/15739) - Account for parallel cables when calculating total path length
+* [#15971](https://github.com/netbox-community/netbox/issues/15971) - Preserve "none" selection in filter form fields
+* [#16238](https://github.com/netbox-community/netbox/issues/16238) - Fix styling for white, gray, and black custom link buttons
+* [#17613](https://github.com/netbox-community/netbox/issues/17613) - Fix layout of object view content on mobile
+* [#17676](https://github.com/netbox-community/netbox/issues/17676) - Fix support for module bay creation when bulk importing module types
+* [#18706](https://github.com/netbox-community/netbox/issues/18706) - Fix validation for VLANs assigned to both a group and a site
+* [#18717](https://github.com/netbox-community/netbox/issues/18717) - Ensure change logs populated for many-to-one changes
+* [#19117](https://github.com/netbox-community/netbox/issues/19117) - Avoid `AttributeError` exception when bulk import objects which have a multi-object custom field with a default value
+* [#19204](https://github.com/netbox-community/netbox/issues/19204) - Improve JSON serialization support for data returned by a custom script
+* [#19217](https://github.com/netbox-community/netbox/issues/19217) - Ensure static assets for the debug toolbar are installed even if `DEBUG` is false
+* [#19228](https://github.com/netbox-community/netbox/issues/19228) - Fix ordering of custom scripts to avoid `NoReverseMatch` exception
+* [#19229](https://github.com/netbox-community/netbox/issues/19229) - Fix `ValueError` exception when attempting to nullify interface mode when a VLAN is assigned
+* [#19275](https://github.com/netbox-community/netbox/issues/19275) - `type` field should not be required when bulk editing interfaces
+* [#19279](https://github.com/netbox-community/netbox/issues/19279) - `status` field should not be required when bulk editing inventory items
+* [#19281](https://github.com/netbox-community/netbox/issues/19281) - Fix form validation failure when attempting to create a service from a service template
+* [#19320](https://github.com/netbox-community/netbox/issues/19320) - Include Q-in-Q VLAN (if any) in VM interface details
+* [#19322](https://github.com/netbox-community/netbox/issues/19322) - Correct URL paths for bulk import views
+* [#19346](https://github.com/netbox-community/netbox/issues/19346) - Ensure all redirect URLs are validated before use
+
+---
+
+## v4.2.8 (2025-04-22)
+
+### Enhancements
+
+* [#17136](https://github.com/netbox-community/netbox/issues/17136) - Introduce the `--readonly` flag on upgrade script
+* [#17908](https://github.com/netbox-community/netbox/issues/17908) - Add trace buttons to terminations under cable view
+* [#18879](https://github.com/netbox-community/netbox/issues/18879) - Enable filtering prefixes by group of assigned VLAN
+* [#18976](https://github.com/netbox-community/netbox/issues/18976) - Include FHRP group name on interface lists
+* [#18978](https://github.com/netbox-community/netbox/issues/18978) - Add 802.1Q mode to interface filter form
+* [#19038](https://github.com/netbox-community/netbox/issues/19038) - Show count of related VLAN groups under cluster view
+* [#19040](https://github.com/netbox-community/netbox/issues/19040) - Add "copy to clipboard" button for rendered config
+* [#19056](https://github.com/netbox-community/netbox/issues/19056) - Enable filtering devices by location slug
+* [#19196](https://github.com/netbox-community/netbox/issues/19196) - Add filtering by VLAN translation policy to interface filter forms
+
+### Bug Fixes
+
+* [#18500](https://github.com/netbox-community/netbox/issues/18500) - `prepare_cloned_fields()` should validate cloning support on model
+* [#18669](https://github.com/netbox-community/netbox/issues/18669) - Ensure default custom field values are respected when creating objects via the REST API
+* [#18881](https://github.com/netbox-community/netbox/issues/18881) - Include missing related object counts under certain views
+* [#18955](https://github.com/netbox-community/netbox/issues/18955) - Omit "clear" button on required choice fields
+* [#18959](https://github.com/netbox-community/netbox/issues/18959) - Preserve ordering of terminations in cable traces
+* [#18961](https://github.com/netbox-community/netbox/issues/18961) - Virtual chassis form should exclude members of other VCs when adding members
+* [#19166](https://github.com/netbox-community/netbox/issues/19166) - Fix custom field choices bulk import support for `base_choices`
+* [#19189](https://github.com/netbox-community/netbox/issues/19189) - The `load_yaml()` convenience method on BaseScript should use SafeLoader
+* [#19195](https://github.com/netbox-community/netbox/issues/19195) - Language cookie should respect `SESSION_COOKIE_SECURE` value
+* [#19230](https://github.com/netbox-community/netbox/issues/19230) - Allow label reuse when creating multiple components from a pattern
+* [#19268](https://github.com/netbox-community/netbox/issues/19268) - Restore editing conflict protection for several object forms
+
+---
+
+## v4.2.7 (2025-04-10)
+
+### Enhancements
+
+* [#16144](https://github.com/netbox-community/netbox/issues/16144) - Add support for plugin models to GetReturnURLMixin
+* [#18138](https://github.com/netbox-community/netbox/issues/18138) - Enable filtering of ObjectVar and MultiObjectVar input selections for custom fields
+* [#18656](https://github.com/netbox-community/netbox/issues/18656) - Enable FHRP group assignment when bulk importing IP addresses
+* [#18980](https://github.com/netbox-community/netbox/issues/18980) - Optimize bulk updates of custom field values when custom fields are added/removed
+* [#19018](https://github.com/netbox-community/netbox/issues/19018) - Add MoCA interface type
+
+### Bug Fixes
+
+* [#18553](https://github.com/netbox-community/netbox/issues/18553) - Avoid clearing site of assigned virtual machines when editing a cluster
+* [#18738](https://github.com/netbox-community/netbox/issues/18738) - Respect declared ordering of custom scripts within a module
+* [#18895](https://github.com/netbox-community/netbox/issues/18895) - Fix GraphQL support for interfaces which terminate virtual circuits
+* [#18904](https://github.com/netbox-community/netbox/issues/18904) - Add missing tags column to config contexts table
+* [#18964](https://github.com/netbox-community/netbox/issues/18964) - Fix "select all" behavior on object lists
+* [#18965](https://github.com/netbox-community/netbox/issues/18965) - "Run script" button should respect default commit toggle for custom scripts
+* [#18991](https://github.com/netbox-community/netbox/issues/18991) - Fix cable path tracing for pass-through ports in REST API
+* [#18999](https://github.com/netbox-community/netbox/issues/18999) - Fix filtering of inventory items with no manufacturer in GraphQL API
+* [#19021](https://github.com/netbox-community/netbox/issues/19021) - Preserve JSONField stylign when `help_text` is passed
+* [#19023](https://github.com/netbox-community/netbox/issues/19023) - `get_field_value()` should honor null values on bound form fields
+* [#19030](https://github.com/netbox-community/netbox/issues/19030) - Prevent pagination buttons from overlapping bulk action buttons on object lists
+* [#19041](https://github.com/netbox-community/netbox/issues/19041) - Fix `IndexError` exception when creating multiple front ports with a label
+* [#19092](https://github.com/netbox-community/netbox/issues/19092) - Fix clearing of scope field when bulk editing prefixes
+* [#19122](https://github.com/netbox-community/netbox/issues/19122) - Fix styling of server error page
+
+---
+
 ## v4.2.6 (2025-03-21)
 
 ### Enhancements
@@ -43,7 +139,6 @@
 * [#17542](https://github.com/netbox-community/netbox/issues/17542) - Add contact assignments to VPN tunnels
 * [#17944](https://github.com/netbox-community/netbox/issues/17944) - Allow script inputs to be filtered on ObjectVar and MultiObjectVar selections
 * [#18024](https://github.com/netbox-community/netbox/issues/18024) - Add permalink URL pattern to match a custom script by module and class name
-* [#18095](https://github.com/netbox-community/netbox/issues/18095) - Ensure contacts are shown on children of objects with contacts
 * [#18141](https://github.com/netbox-community/netbox/issues/18141) - Support "Quick Add" for plugins
 * [#18403](https://github.com/netbox-community/netbox/issues/18403) - Improve performance of job list views
 * [#18693](https://github.com/netbox-community/netbox/issues/18693) - Support setting VLAN translation on bulk edit of interfaces
