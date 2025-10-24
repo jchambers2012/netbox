@@ -10,6 +10,22 @@ Minor releases are published in April, August, and December of each calendar yea
 
 This page contains a history of all major and minor releases since NetBox v2.0. For more detail on a specific patch release, please see the release notes page for that specific minor release.
 
+#### [Version 4.4](./version-4.4.md) (September 2025)
+
+* Background Jobs for Bulk Operations ([#19589](https://github.com/netbox-community/netbox/issues/19589), [#19891](https://github.com/netbox-community/netbox/issues/19891))
+* Logging Mechanism for Background Jobs ([#19816](https://github.com/netbox-community/netbox/issues/19816))
+* Changelog Comments ([#19713](https://github.com/netbox-community/netbox/issues/19713))
+* Config Context Data Validation ([#19377](https://github.com/netbox-community/netbox/issues/19377))
+
+#### [Version 4.3](./version-4.3.md) (May 2025)
+
+* Module Type Profiles & Custom Attributes ([#19002](https://github.com/netbox-community/netbox/issues/19002))
+* Reusable Table Configurations ([#14591](https://github.com/netbox-community/netbox/issues/14591))
+* Option to Treat IP Ranges as Fully Populated ([#9763](https://github.com/netbox-community/netbox/issues/9763))
+* Hierarchical Device Roles ([#18245](https://github.com/netbox-community/netbox/issues/18245))
+* Periodic Synchronization of Data Sources ([#18287](https://github.com/netbox-community/netbox/issues/18287))
+* Proxy Routing ([#18627](https://github.com/netbox-community/netbox/issues/18627))
+
 #### [Version 4.2](./version-4.2.md) (January 2025)
 
 * Assign Multiple MAC Addresses per Interface ([#4867](https://github.com/netbox-community/netbox/issues/4867))

@@ -19,6 +19,9 @@ urlpatterns = [
     path('export-templates/', include(get_model_urls('extras', 'exporttemplate', detail=False))),
     path('export-templates/<int:pk>/', include(get_model_urls('extras', 'exporttemplate'))),
 
+    path('table-configs/', include(get_model_urls('extras', 'tableconfig', detail=False))),
+    path('table-configs/<int:pk>/', include(get_model_urls('extras', 'tableconfig'))),
+
     path('saved-filters/', include(get_model_urls('extras', 'savedfilter', detail=False))),
     path('saved-filters/<int:pk>/', include(get_model_urls('extras', 'savedfilter'))),
 
@@ -43,6 +46,9 @@ urlpatterns = [
 
     path('tags/', include(get_model_urls('extras', 'tag', detail=False))),
     path('tags/<int:pk>/', include(get_model_urls('extras', 'tag'))),
+
+    path('config-context-profiles/', include(get_model_urls('extras', 'configcontextprofile', detail=False))),
+    path('config-context-profiles/<int:pk>/', include(get_model_urls('extras', 'configcontextprofile'))),
 
     path('config-contexts/', include(get_model_urls('extras', 'configcontext', detail=False))),
     path('config-contexts/<int:pk>/', include(get_model_urls('extras', 'configcontext'))),

@@ -20,6 +20,7 @@ from netbox.api.viewsets import NetBoxModelViewSet, MPTTLockedMixin
 from netbox.api.viewsets.mixins import SequentialBulkCreatesMixin
 from utilities.api import get_serializer_for_model
 from utilities.query_functions import CollateAsChar
+from virtualization.models import VirtualMachine
 from . import serializers
 from .exceptions import MissingFilterException
 
@@ -270,6 +271,12 @@ class DeviceTypeViewSet(NetBoxModelViewSet):
     filterset_class = filtersets.DeviceTypeFilterSet
 
 
+class ModuleTypeProfileViewSet(NetBoxModelViewSet):
+    queryset = ModuleTypeProfile.objects.all()
+    serializer_class = serializers.ModuleTypeProfileSerializer
+    filterset_class = filtersets.ModuleTypeProfileFilterSet
+
+
 class ModuleTypeViewSet(NetBoxModelViewSet):
     queryset = ModuleType.objects.all()
     serializer_class = serializers.ModuleTypeSerializer
@@ -345,7 +352,19 @@ class InventoryItemTemplateViewSet(MPTTLockedMixin, NetBoxModelViewSet):
 #
 
 class DeviceRoleViewSet(NetBoxModelViewSet):
-    queryset = DeviceRole.objects.all()
+    queryset = DeviceRole.objects.add_related_count(
+        DeviceRole.objects.add_related_count(
+            DeviceRole.objects.all(),
+            VirtualMachine,
+            'role',
+            'virtualmachine_count',
+            cumulative=True
+        ),
+        Device,
+        'role',
+        'device_count',
+        cumulative=True
+    )
     serializer_class = serializers.DeviceRoleSerializer
     filterset_class = filtersets.DeviceRoleFilterSet
 
@@ -354,8 +373,20 @@ class DeviceRoleViewSet(NetBoxModelViewSet):
 # Platforms
 #
 
-class PlatformViewSet(NetBoxModelViewSet):
-    queryset = Platform.objects.all()
+class PlatformViewSet(MPTTLockedMixin, NetBoxModelViewSet):
+    queryset = Platform.objects.add_related_count(
+        Platform.objects.add_related_count(
+            Platform.objects.all(),
+            VirtualMachine,
+            'platform',
+            'virtualmachine_count',
+            cumulative=True
+        ),
+        Device,
+        'platform',
+        'device_count',
+        cumulative=True
+    )
     serializer_class = serializers.PlatformSerializer
     filterset_class = filtersets.PlatformFilterSet
 
@@ -455,6 +486,7 @@ class InterfaceViewSet(PathEndpointMixin, NetBoxModelViewSet):
                 Interface.objects.select_related("device", "cable"),
             ],
         ),
+        'virtual_circuit_termination',
         'l2vpn_terminations',  # Referenced by InterfaceSerializer.l2vpn_termination
         'ip_addresses',  # Referenced by Interface.count_ipaddresses()
         'fhrp_group_assignments',  # Referenced by Interface.count_fhrp_groups()

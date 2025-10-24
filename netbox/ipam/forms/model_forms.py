@@ -20,8 +20,9 @@ from utilities.forms.fields import (
 from utilities.forms.rendering import FieldSet, InlineFields, ObjectAttribute, TabbedGroups
 from utilities.forms.utils import get_field_value
 from utilities.forms.widgets import DatePicker, HTMXSelect
+from django.utils.safestring import mark_safe
 from utilities.templatetags.builtins.filters import bettertitle
-from virtualization.models import VirtualMachine, VMInterface
+from virtualization.models import VMInterface, VirtualMachine
 
 __all__ = (
     'AggregateForm',
@@ -265,8 +266,8 @@ class IPRangeForm(TenancyForm, NetBoxModelForm):
 
     fieldsets = (
         FieldSet(
-            'vrf', 'start_address', 'end_address', 'role', 'status', 'mark_utilized', 'description', 'tags',
-            name=_('IP Range')
+            'vrf', 'start_address', 'end_address', 'role', 'status', 'mark_populated', 'mark_utilized', 'description',
+            'tags', name=_('IP Range')
         ),
         FieldSet('tenant_group', 'tenant', name=_('Tenancy')),
     )
@@ -274,8 +275,8 @@ class IPRangeForm(TenancyForm, NetBoxModelForm):
     class Meta:
         model = IPRange
         fields = [
-            'vrf', 'start_address', 'end_address', 'status', 'role', 'tenant_group', 'tenant', 'mark_utilized',
-            'description', 'comments', 'tags',
+            'vrf', 'start_address', 'end_address', 'status', 'role', 'tenant_group', 'tenant', 'mark_populated',
+            'mark_utilized', 'description', 'comments', 'tags',
         ]
 
 
@@ -538,7 +539,6 @@ class FHRPGroupForm(NetBoxModelForm):
                 role=FHRP_PROTOCOL_ROLE_MAPPINGS.get(self.cleaned_data['protocol'], IPAddressRoleChoices.ROLE_VIP),
                 assigned_object=instance
             )
-            ipaddress.populate_custom_field_defaults()
             ipaddress.save()
 
             # Check that the new IPAddress conforms with any assigned object-level permissions
@@ -580,13 +580,6 @@ class FHRPGroupAssignmentForm(forms.ModelForm):
         model = FHRPGroupAssignment
         fields = ('group', 'priority')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        ipaddresses = self.instance.interface.ip_addresses.all()
-        for ipaddress in ipaddresses:
-            self.fields['group'].widget.add_query_param('related_ip', ipaddress.pk)
-
     def clean_group(self):
         group = self.cleaned_data['group']
 
@@ -606,7 +599,7 @@ class FHRPGroupAssignmentForm(forms.ModelForm):
         return group
 
 
-class VLANGroupForm(NetBoxModelForm):
+class VLANGroupForm(TenancyForm, NetBoxModelForm):
     slug = SlugField()
     vid_ranges = NumericRangeArrayField(
         label=_('VLAN IDs')
@@ -629,12 +622,13 @@ class VLANGroupForm(NetBoxModelForm):
         FieldSet('name', 'slug', 'description', 'tags', name=_('VLAN Group')),
         FieldSet('vid_ranges', name=_('Child VLANs')),
         FieldSet('scope_type', 'scope', name=_('Scope')),
+        FieldSet('tenant_group', 'tenant', name=_('Tenancy')),
     )
 
     class Meta:
         model = VLANGroup
         fields = [
-            'name', 'slug', 'description', 'vid_ranges', 'scope_type', 'tags',
+            'name', 'slug', 'description', 'vid_ranges', 'scope_type', 'tenant_group', 'tenant', 'tags',
         ]
 
     def __init__(self, *args, **kwargs):
@@ -680,7 +674,15 @@ class VLANForm(TenancyForm, NetBoxModelForm):
         queryset=Site.objects.all(),
         required=False,
         null_option='None',
-        selector=True
+        selector=True,
+        help_text=mark_safe(
+            '<span class="text-warning"><i class="mdi mdi-alert"></i> {text}</span>'.format(
+                text=_(
+                    'The direct assignment of VLANs to a site is deprecated and will be removed in a future release. '
+                    'Users are encouraged to utilize VLAN groups for this purpose.'
+                )
+            )
+        )
     )
     role = DynamicModelChoiceField(
         label=_('Role'),
@@ -749,7 +751,7 @@ class ServiceTemplateForm(NetBoxModelForm):
     comments = CommentField()
 
     fieldsets = (
-        FieldSet('name', 'protocol', 'ports', 'description', 'tags', name=_('Service Template')),
+        FieldSet('name', 'protocol', 'ports', 'description', 'tags', name=_('Application Service Template')),
     )
 
     class Meta:
@@ -758,16 +760,17 @@ class ServiceTemplateForm(NetBoxModelForm):
 
 
 class ServiceForm(NetBoxModelForm):
-    device = DynamicModelChoiceField(
-        label=_('Device'),
-        queryset=Device.objects.all(),
-        required=False,
-        selector=True
+    parent_object_type = ContentTypeChoiceField(
+        queryset=ContentType.objects.filter(SERVICE_ASSIGNMENT_MODELS),
+        widget=HTMXSelect(),
+        required=True,
+        label=_('Parent type')
     )
-    virtual_machine = DynamicModelChoiceField(
-        label=_('Virtual machine'),
-        queryset=VirtualMachine.objects.all(),
-        required=False,
+    parent = DynamicModelChoiceField(
+        label=_('Parent'),
+        queryset=Device.objects.none(),  # Initial queryset
+        required=True,
+        disabled=True,
         selector=True
     )
     ports = NumericArrayField(
@@ -782,57 +785,87 @@ class ServiceForm(NetBoxModelForm):
         queryset=IPAddress.objects.all(),
         required=False,
         label=_('IP Addresses'),
-        query_params={
-            'device_id': '$device',
-            'virtual_machine_id': '$virtual_machine',
-        }
     )
     comments = CommentField()
 
     fieldsets = (
         FieldSet(
-            TabbedGroups(
-                FieldSet('device', name=_('Device')),
-                FieldSet('virtual_machine', name=_('Virtual Machine')),
-            ),
-            'name',
+            'parent_object_type', 'parent', 'name',
             InlineFields('protocol', 'ports', label=_('Port(s)')),
-            'ipaddresses', 'description', 'tags', name=_('Service')
+            'ipaddresses', 'description', 'tags', name=_('Application Service')
         ),
     )
 
     class Meta:
         model = Service
         fields = [
-            'device', 'virtual_machine', 'name', 'protocol', 'ports', 'ipaddresses', 'description', 'comments', 'tags',
+            'name', 'protocol', 'ports', 'ipaddresses', 'description', 'comments', 'tags',
+            'parent_object_type',
         ]
+
+    def __init__(self, *args, **kwargs):
+        initial = kwargs.get('initial', {}).copy()
+
+        if (instance := kwargs.get('instance', None)) and instance.parent:
+            initial['parent'] = instance.parent
+
+        kwargs['initial'] = initial
+
+        super().__init__(*args, **kwargs)
+
+        if parent_object_type_id := get_field_value(self, 'parent_object_type'):
+            try:
+                parent_type = ContentType.objects.get(pk=parent_object_type_id)
+                model = parent_type.model_class()
+                if model == Device:
+                    self.fields['ipaddresses'].widget.add_query_params({
+                        'device_id': '$parent',
+                    })
+                elif model == VirtualMachine:
+                    self.fields['ipaddresses'].widget.add_query_params({
+                        'virtual_machine_id': '$parent',
+                    })
+                elif model == FHRPGroup:
+                    self.fields['ipaddresses'].widget.add_query_params({
+                        'fhrpgroup_id': '$parent',
+                    })
+                self.fields['parent'].queryset = model.objects.all()
+                self.fields['parent'].widget.attrs['selector'] = model._meta.label_lower
+                self.fields['parent'].disabled = False
+                self.fields['parent'].label = _(bettertitle(model._meta.verbose_name))
+            except ObjectDoesNotExist:
+                pass
+
+            if self.instance and self.instance.pk and parent_object_type_id != self.instance.parent_object_type_id:
+                self.initial['parent'] = None
+
+    def clean(self):
+        super().clean()
+        self.instance.parent = self.cleaned_data.get('parent')
 
 
 class ServiceCreateForm(ServiceForm):
     service_template = DynamicModelChoiceField(
-        label=_('Service template'),
+        label=_('Application Service template'),
         queryset=ServiceTemplate.objects.all(),
         required=False
     )
 
     fieldsets = (
         FieldSet(
-            TabbedGroups(
-                FieldSet('device', name=_('Device')),
-                FieldSet('virtual_machine', name=_('Virtual Machine')),
-            ),
+            'parent_object_type', 'parent',
             TabbedGroups(
                 FieldSet('service_template', name=_('From Template')),
                 FieldSet('name', 'protocol', 'ports', name=_('Custom')),
             ),
-            'ipaddresses', 'description', 'tags', name=_('Service')
+            'ipaddresses', 'description', 'tags', name=_('Application Service')
         ),
     )
 
     class Meta(ServiceForm.Meta):
         fields = [
-            'device', 'virtual_machine', 'service_template', 'name', 'protocol', 'ports', 'ipaddresses', 'description',
-            'comments', 'tags',
+            'service_template', 'name', 'protocol', 'ports', 'ipaddresses', 'description',
+            'comments', 'tags', 'parent_object_type',
         ]
 
     def __init__(self, *args, **kwargs):
@@ -841,6 +874,7 @@ class ServiceCreateForm(ServiceForm):
         # Fields which may be populated from a ServiceTemplate are not required
         for field in ('name', 'protocol', 'ports'):
             self.fields[field].required = False
+            self.fields[field].widget.is_required = False
 
     def clean(self):
         super().clean()
@@ -853,4 +887,6 @@ class ServiceCreateForm(ServiceForm):
             if not self.cleaned_data['description']:
                 self.cleaned_data['description'] = service_template.description
         elif not all(self.cleaned_data[f] for f in ('name', 'protocol', 'ports')):
-            raise forms.ValidationError(_("Must specify name, protocol, and port(s) if not using a service template."))
+            raise forms.ValidationError(
+                _("Must specify name, protocol, and port(s) if not using an application service template.")
+            )

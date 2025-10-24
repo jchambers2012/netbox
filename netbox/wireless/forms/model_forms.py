@@ -7,6 +7,7 @@ from ipam.models import VLAN
 from netbox.forms import NetBoxModelForm
 from tenancy.forms import TenancyForm
 from utilities.forms.fields import CommentField, DynamicModelChoiceField, SlugField
+from utilities.forms.mixins import DistanceValidationMixin
 from utilities.forms.rendering import FieldSet, InlineFields
 from wireless.models import *
 
@@ -24,6 +25,7 @@ class WirelessLANGroupForm(NetBoxModelForm):
         required=False
     )
     slug = SlugField()
+    comments = CommentField()
 
     fieldsets = (
         FieldSet('parent', 'name', 'slug', 'description', 'tags', name=_('Wireless LAN Group')),
@@ -32,7 +34,7 @@ class WirelessLANGroupForm(NetBoxModelForm):
     class Meta:
         model = WirelessLANGroup
         fields = [
-            'parent', 'name', 'slug', 'description', 'tags',
+            'parent', 'name', 'slug', 'description', 'tags', 'comments',
         ]
 
 
@@ -72,7 +74,7 @@ class WirelessLANForm(ScopedForm, TenancyForm, NetBoxModelForm):
         }
 
 
-class WirelessLinkForm(TenancyForm, NetBoxModelForm):
+class WirelessLinkForm(DistanceValidationMixin, TenancyForm, NetBoxModelForm):
     site_a = DynamicModelChoiceField(
         queryset=Site.objects.all(),
         required=False,

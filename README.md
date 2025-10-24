@@ -6,9 +6,9 @@
   <a href="https://github.com/netbox-community/netbox/graphs/contributors"><img src="https://img.shields.io/github/contributors/netbox-community/netbox?color=blue" alt="Contributors" /></a>
   <a href="https://github.com/netbox-community/netbox/stargazers"><img src="https://img.shields.io/github/stars/netbox-community/netbox?style=flat" alt="GitHub stars" /></a>
   <a href="https://explore.transifex.com/netbox-community/netbox/"><img src="https://img.shields.io/badge/languages-15-blue" alt="Languages supported" /></a>
-  <a href="https://github.com/netbox-community/netbox/actions/workflows/ci.yml"><img src="https://github.com/netbox-community/netbox/workflows/CI/badge.svg?branch=main" alt="CI status" /></a>
+  <a href="https://github.com/netbox-community/netbox/actions/workflows/ci.yml"><img src="https://github.com/netbox-community/netbox/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
   <p>
-    <strong><a href="https://github.com/netbox-community/netbox/">NetBox Community</a></strong> |
+    <strong><a href="https://netboxlabs.com/community/">NetBox Community</a></strong> |
     <strong><a href="https://netboxlabs.com/netbox-cloud/">NetBox Cloud</a></strong> |
     <strong><a href="https://netboxlabs.com/netbox-enterprise/">NetBox Enterprise</a></strong>
   </p>
@@ -91,7 +91,6 @@ NetBox automatically logs the creation, modification, and deletion of all manage
 * Join the conversation on [the discussion forum](https://github.com/netbox-community/netbox/discussions) and [Slack](https://netdev.chat/)!
 * Already a power user? You can [suggest a feature](https://github.com/netbox-community/netbox/issues/new?assignees=&labels=type%3A+feature&template=feature_request.yaml) or [report a bug](https://github.com/netbox-community/netbox/issues/new?assignees=&labels=type%3A+bug&template=bug_report.yaml) on GitHub.
 * Contributions from the community are encouraged and appreciated! Check out our [contributing guide](CONTRIBUTING.md) to get started.
-* [Share your idea](https://plugin-ideas.netbox.dev/) for a new plugin, or [learn how to build one](https://github.com/netbox-community/netbox-plugin-tutorial) yourself!
 
 ## Screenshots
 

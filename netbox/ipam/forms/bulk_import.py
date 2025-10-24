@@ -275,8 +275,8 @@ class IPRangeImportForm(NetBoxModelImportForm):
     class Meta:
         model = IPRange
         fields = (
-            'start_address', 'end_address', 'vrf', 'tenant', 'status', 'role', 'mark_utilized', 'description',
-            'comments', 'tags',
+            'start_address', 'end_address', 'vrf', 'tenant', 'status', 'role', 'mark_populated', 'mark_utilized',
+            'description', 'comments', 'tags',
         )
 
 
@@ -327,6 +327,13 @@ class IPAddressImportForm(NetBoxModelImportForm):
         to_field_name='name',
         help_text=_('Assigned interface')
     )
+    fhrp_group = CSVModelChoiceField(
+        label=_('FHRP Group'),
+        queryset=FHRPGroup.objects.all(),
+        required=False,
+        to_field_name='name',
+        help_text=_('Assigned FHRP Group name')
+    )
     is_primary = forms.BooleanField(
         label=_('Is primary'),
         help_text=_('Make this the primary IP for the assigned device'),
@@ -341,8 +348,8 @@ class IPAddressImportForm(NetBoxModelImportForm):
     class Meta:
         model = IPAddress
         fields = [
-            'address', 'vrf', 'tenant', 'status', 'role', 'device', 'virtual_machine', 'interface', 'is_primary',
-            'is_oob', 'dns_name', 'description', 'comments', 'tags',
+            'address', 'vrf', 'tenant', 'status', 'role', 'device', 'virtual_machine', 'interface', 'fhrp_group',
+            'is_primary', 'is_oob', 'dns_name', 'description', 'comments', 'tags',
         ]
 
     def __init__(self, data=None, *args, **kwargs):
@@ -398,6 +405,8 @@ class IPAddressImportForm(NetBoxModelImportForm):
         # Set interface assignment
         if self.cleaned_data.get('interface'):
             self.instance.assigned_object = self.cleaned_data['interface']
+        if self.cleaned_data.get('fhrp_group'):
+            self.instance.assigned_object = self.cleaned_data['fhrp_group']
 
         ipaddress = super().save(*args, **kwargs)
 
@@ -445,10 +454,17 @@ class VLANGroupImportForm(NetBoxModelImportForm):
     vid_ranges = NumericRangeArrayField(
         required=False
     )
+    tenant = CSVModelChoiceField(
+        label=_('Tenant'),
+        queryset=Tenant.objects.all(),
+        required=False,
+        to_field_name='name',
+        help_text=_('Assigned tenant')
+    )
 
     class Meta:
         model = VLANGroup
-        fields = ('name', 'slug', 'scope_type', 'scope_id', 'vid_ranges', 'description', 'tags')
+        fields = ('name', 'slug', 'scope_type', 'scope_id', 'vid_ranges', 'tenant', 'description', 'tags')
         labels = {
             'scope_id': 'Scope ID',
         }
@@ -543,19 +559,21 @@ class ServiceTemplateImportForm(NetBoxModelImportForm):
 
 
 class ServiceImportForm(NetBoxModelImportForm):
-    device = CSVModelChoiceField(
-        label=_('Device'),
+    parent_object_type = CSVContentTypeField(
+        queryset=ContentType.objects.filter(SERVICE_ASSIGNMENT_MODELS),
+        required=True,
+        label=_('Parent type (app & model)')
+    )
+    parent = CSVModelChoiceField(
+        label=_('Parent'),
         queryset=Device.objects.all(),
         required=False,
         to_field_name='name',
-        help_text=_('Required if not assigned to a VM')
+        help_text=_('Parent object name')
     )
-    virtual_machine = CSVModelChoiceField(
-        label=_('Virtual machine'),
-        queryset=VirtualMachine.objects.all(),
+    parent_object_id = forms.IntegerField(
         required=False,
-        to_field_name='name',
-        help_text=_('Required if not assigned to a device')
+        help_text=_('Parent object ID'),
     )
     protocol = CSVChoiceField(
         label=_('Protocol'),
@@ -572,15 +590,55 @@ class ServiceImportForm(NetBoxModelImportForm):
     class Meta:
         model = Service
         fields = (
-            'device', 'virtual_machine', 'ipaddresses', 'name', 'protocol', 'ports', 'description', 'comments', 'tags',
+            'ipaddresses', 'name', 'protocol', 'ports', 'description', 'comments', 'tags',
         )
 
-    def clean_ipaddresses(self):
-        parent = self.cleaned_data.get('device') or self.cleaned_data.get('virtual_machine')
-        for ip_address in self.cleaned_data['ipaddresses']:
-            if not ip_address.assigned_object or getattr(ip_address.assigned_object, 'parent_object') != parent:
+    def __init__(self, data=None, *args, **kwargs):
+        super().__init__(data, *args, **kwargs)
+
+        # Limit parent queryset by assigned parent object type
+        if data:
+            match data.get('parent_object_type'):
+                case 'dcim.device':
+                    self.fields['parent'].queryset = Device.objects.all()
+                case 'ipam.fhrpgroup':
+                    self.fields['parent'].queryset = FHRPGroup.objects.all()
+                case 'virtualization.virtualmachine':
+                    self.fields['parent'].queryset = VirtualMachine.objects.all()
+
+    def save(self, *args, **kwargs):
+        if (parent := self.cleaned_data.get('parent')):
+            self.instance.parent = parent
+
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+
+        if (parent_ct := self.cleaned_data.get('parent_object_type')):
+            if (parent := self.cleaned_data.get('parent')):
+                self.cleaned_data['parent_object_id'] = parent.pk
+            elif (parent_id := self.cleaned_data.get('parent_object_id')):
+                parent = parent_ct.model_class().objects.filter(id=parent_id).first()
+                self.cleaned_data['parent'] = parent
+            else:
+                # If a parent object type is passed and we've made it here, then raise a validation
+                # error since an associated parent object or parent object id has not been passed
                 raise forms.ValidationError(
-                    _("{ip} is not assigned to this device/VM.").format(ip=ip_address)
+                    _("One of parent or parent_object_id must be included with parent_object_type")
                 )
 
-        return self.cleaned_data['ipaddresses']
+        # making sure parent is defined. In cases where an import is resulting in an update, the
+        # import data might not include the parent object and so the above logic might not be
+        # triggered
+        parent = self.cleaned_data.get('parent')
+        for ip_address in self.cleaned_data.get('ipaddresses', []):
+            if not (assigned := ip_address.assigned_object) or (        # no assigned object
+                (isinstance(parent, FHRPGroup) and assigned != parent)  # assigned to FHRPGroup
+                and getattr(assigned, 'parent_object') != parent        # assigned to [VM]Interface
+            ):
+                raise forms.ValidationError(
+                    _("{ip} is not assigned to this parent.").format(ip=ip_address)
+                )
+
+        return self.cleaned_data

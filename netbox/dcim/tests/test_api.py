@@ -1,6 +1,6 @@
 import json
 
-from django.test import override_settings
+from django.test import override_settings, tag
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from rest_framework import status
@@ -14,7 +14,7 @@ from ipam.models import ASN, RIR, VLAN, VRF
 from netbox.api.serializers import GenericObjectSerializer
 from tenancy.models import Tenant
 from users.models import User
-from utilities.testing import APITestCase, APIViewTestCases, create_test_device
+from utilities.testing import APITestCase, APIViewTestCases, create_test_device, disable_logging
 from virtualization.models import Cluster, ClusterType
 from wireless.choices import WirelessChannelChoices
 from wireless.models import WirelessLAN
@@ -74,6 +74,7 @@ class RegionTest(APIViewTestCases.APIViewTestCase):
         {
             'name': 'Region 4',
             'slug': 'region-4',
+            'comments': 'this is region 4, not region 5',
         },
         {
             'name': 'Region 5',
@@ -86,13 +87,14 @@ class RegionTest(APIViewTestCases.APIViewTestCase):
     ]
     bulk_update_data = {
         'description': 'New description',
+        'comments': 'New comments',
     }
 
     @classmethod
     def setUpTestData(cls):
 
         Region.objects.create(name='Region 1', slug='region-1')
-        Region.objects.create(name='Region 2', slug='region-2')
+        Region.objects.create(name='Region 2', slug='region-2', comments='what in the world is happening?')
         Region.objects.create(name='Region 3', slug='region-3')
 
 
@@ -103,26 +105,30 @@ class SiteGroupTest(APIViewTestCases.APIViewTestCase):
         {
             'name': 'Site Group 4',
             'slug': 'site-group-4',
+            'comments': '',
         },
         {
             'name': 'Site Group 5',
             'slug': 'site-group-5',
+            'comments': 'not actually empty',
         },
         {
             'name': 'Site Group 6',
             'slug': 'site-group-6',
+            'comments': 'Do I really exist?',
         },
     ]
     bulk_update_data = {
         'description': 'New description',
+        'comments': 'I do exist!',
     }
 
     @classmethod
     def setUpTestData(cls):
 
         SiteGroup.objects.create(name='Site Group 1', slug='site-group-1')
-        SiteGroup.objects.create(name='Site Group 2', slug='site-group-2')
-        SiteGroup.objects.create(name='Site Group 3', slug='site-group-3')
+        SiteGroup.objects.create(name='Site Group 2', slug='site-group-2', comments='')
+        SiteGroup.objects.create(name='Site Group 3', slug='site-group-3', comments='Hi!')
 
 
 class SiteTest(APIViewTestCases.APIViewTestCase):
@@ -212,12 +218,14 @@ class LocationTest(APIViewTestCases.APIViewTestCase):
                 name='Parent Location 1',
                 slug='parent-location-1',
                 status=LocationStatusChoices.STATUS_ACTIVE,
+                comments='First!'
             ),
             Location.objects.create(
                 site=sites[1],
                 name='Parent Location 2',
                 slug='parent-location-2',
                 status=LocationStatusChoices.STATUS_ACTIVE,
+                comments='Second!'
             ),
         )
 
@@ -227,6 +235,7 @@ class LocationTest(APIViewTestCases.APIViewTestCase):
             slug='location-1',
             parent=parent_locations[0],
             status=LocationStatusChoices.STATUS_ACTIVE,
+            comments='Third!'
         )
         Location.objects.create(
             site=sites[0],
@@ -250,6 +259,7 @@ class LocationTest(APIViewTestCases.APIViewTestCase):
                 'site': sites[1].pk,
                 'parent': parent_locations[1].pk,
                 'status': LocationStatusChoices.STATUS_PLANNED,
+                'comments': '',
             },
             {
                 'name': 'Test Location 5',
@@ -257,6 +267,7 @@ class LocationTest(APIViewTestCases.APIViewTestCase):
                 'site': sites[1].pk,
                 'parent': parent_locations[1].pk,
                 'status': LocationStatusChoices.STATUS_PLANNED,
+                'comments': 'Somebody should check on this location',
             },
             {
                 'name': 'Test Location 6',
@@ -454,7 +465,7 @@ class RackTest(APIViewTestCases.APIViewTestCase):
 
 class RackReservationTest(APIViewTestCases.APIViewTestCase):
     model = RackReservation
-    brief_fields = ['description', 'display', 'id', 'units', 'url', 'user']
+    brief_fields = ['description', 'display', 'id', 'status', 'units', 'url', 'user']
     bulk_update_data = {
         'description': 'New description',
     }
@@ -472,9 +483,24 @@ class RackReservationTest(APIViewTestCases.APIViewTestCase):
         Rack.objects.bulk_create(racks)
 
         rack_reservations = (
-            RackReservation(rack=racks[0], units=[1, 2, 3], user=user, description='Reservation #1'),
-            RackReservation(rack=racks[0], units=[4, 5, 6], user=user, description='Reservation #2'),
-            RackReservation(rack=racks[0], units=[7, 8, 9], user=user, description='Reservation #3'),
+            RackReservation(
+                rack=racks[0],
+                units=[1, 2, 3],
+                user=user,
+                description='Reservation #1',
+            ),
+            RackReservation(
+                rack=racks[0],
+                units=[4, 5, 6],
+                user=user,
+                description='Reservation #2'
+            ),
+            RackReservation(
+                rack=racks[0],
+                units=[7, 8, 9],
+                user=user,
+                description='Reservation #3',
+            ),
         )
         RackReservation.objects.bulk_create(rack_reservations)
 
@@ -482,18 +508,21 @@ class RackReservationTest(APIViewTestCases.APIViewTestCase):
             {
                 'rack': racks[1].pk,
                 'units': [10, 11, 12],
+                'status': RackReservationStatusChoices.STATUS_ACTIVE,
                 'user': user.pk,
                 'description': 'Reservation #4',
             },
             {
                 'rack': racks[1].pk,
                 'units': [13, 14, 15],
+                'status': RackReservationStatusChoices.STATUS_PENDING,
                 'user': user.pk,
                 'description': 'Reservation #5',
             },
             {
                 'rack': racks[1].pk,
                 'units': [16, 17, 18],
+                'status': RackReservationStatusChoices.STATUS_STALE,
                 'user': user.pk,
                 'description': 'Reservation #6',
             },
@@ -580,7 +609,7 @@ class DeviceTypeTest(APIViewTestCases.APIViewTestCase):
 
 class ModuleTypeTest(APIViewTestCases.APIViewTestCase):
     model = ModuleType
-    brief_fields = ['description', 'display', 'id', 'manufacturer', 'model', 'url']
+    brief_fields = ['description', 'display', 'id', 'manufacturer', 'model', 'profile', 'url']
     bulk_update_data = {
         'part_number': 'ABC123',
     }
@@ -616,6 +645,70 @@ class ModuleTypeTest(APIViewTestCases.APIViewTestCase):
                 'model': 'Module Type 6',
             },
         ]
+
+
+class ModuleTypeProfileTest(APIViewTestCases.APIViewTestCase):
+    model = ModuleTypeProfile
+    brief_fields = ['description', 'display', 'id', 'name', 'url']
+    SCHEMAS = [
+        {
+            "properties": {
+                "foo": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "properties": {
+                "foo": {
+                    "type": "integer"
+                }
+            }
+        },
+        {
+            "properties": {
+                "foo": {
+                    "type": "boolean"
+                }
+            }
+        },
+    ]
+    create_data = [
+        {
+            'name': 'Module Type Profile 4',
+            'schema': SCHEMAS[0],
+        },
+        {
+            'name': 'Module Type Profile 5',
+            'schema': SCHEMAS[1],
+        },
+        {
+            'name': 'Module Type Profile 6',
+            'schema': SCHEMAS[2],
+        },
+    ]
+    bulk_update_data = {
+        'description': 'New description',
+        'comments': 'New comments',
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        module_type_profiles = (
+            ModuleTypeProfile(
+                name='Module Type Profile 1',
+                schema=cls.SCHEMAS[0]
+            ),
+            ModuleTypeProfile(
+                name='Module Type Profile 2',
+                schema=cls.SCHEMAS[1]
+            ),
+            ModuleTypeProfile(
+                name='Module Type Profile 3',
+                schema=cls.SCHEMAS[2]
+            ),
+        )
+        ModuleTypeProfile.objects.bulk_create(module_type_profiles)
 
 
 class ConsolePortTemplateTest(APIViewTestCases.APIViewTestCase):
@@ -1138,7 +1231,9 @@ class InventoryItemTemplateTest(APIViewTestCases.APIViewTestCase):
 
 class DeviceRoleTest(APIViewTestCases.APIViewTestCase):
     model = DeviceRole
-    brief_fields = ['description', 'device_count', 'display', 'id', 'name', 'slug', 'url', 'virtualmachine_count']
+    brief_fields = [
+        '_depth', 'description', 'device_count', 'display', 'id', 'name', 'slug', 'url', 'virtualmachine_count'
+    ]
     create_data = [
         {
             'name': 'Device Role 4',
@@ -1163,17 +1258,16 @@ class DeviceRoleTest(APIViewTestCases.APIViewTestCase):
     @classmethod
     def setUpTestData(cls):
 
-        roles = (
-            DeviceRole(name='Device Role 1', slug='device-role-1', color='ff0000'),
-            DeviceRole(name='Device Role 2', slug='device-role-2', color='00ff00'),
-            DeviceRole(name='Device Role 3', slug='device-role-3', color='0000ff'),
-        )
-        DeviceRole.objects.bulk_create(roles)
+        DeviceRole.objects.create(name='Device Role 1', slug='device-role-1', color='ff0000')
+        DeviceRole.objects.create(name='Device Role 2', slug='device-role-2', color='00ff00')
+        DeviceRole.objects.create(name='Device Role 3', slug='device-role-3', color='0000ff')
 
 
 class PlatformTest(APIViewTestCases.APIViewTestCase):
     model = Platform
-    brief_fields = ['description', 'device_count', 'display', 'id', 'name', 'slug', 'url', 'virtualmachine_count']
+    brief_fields = [
+        '_depth', 'description', 'device_count', 'display', 'id', 'name', 'slug', 'url', 'virtualmachine_count',
+    ]
     create_data = [
         {
             'name': 'Platform 4',
@@ -1200,7 +1294,8 @@ class PlatformTest(APIViewTestCases.APIViewTestCase):
             Platform(name='Platform 2', slug='platform-2'),
             Platform(name='Platform 3', slug='platform-3'),
         )
-        Platform.objects.bulk_create(platforms)
+        for platform in platforms:
+            platform.save()
 
 
 class DeviceTest(APIViewTestCases.APIViewTestCase):
@@ -1241,7 +1336,8 @@ class DeviceTest(APIViewTestCases.APIViewTestCase):
             DeviceRole(name='Device Role 1', slug='device-role-1', color='ff0000'),
             DeviceRole(name='Device Role 2', slug='device-role-2', color='00ff00'),
         )
-        DeviceRole.objects.bulk_create(roles)
+        for role in roles:
+            role.save()
 
         cluster_type = ClusterType.objects.create(name='Cluster Type 1', slug='cluster-type-1')
 
@@ -1783,7 +1879,8 @@ class InterfaceTest(Mixins.ComponentTraceMixin, APIViewTestCases.APIViewTestCase
 
         # Attempt to delete only the parent interface
         url = self._get_detail_url(interface1)
-        self.client.delete(url, **self.header)
+        with disable_logging():
+            self.client.delete(url, **self.header)
         self.assertEqual(device.interfaces.count(), 4)  # Parent was not deleted
 
         # Attempt to bulk delete parent & child together
@@ -1904,6 +2001,27 @@ class FrontPortTest(APIViewTestCases.APIViewTestCase):
             },
         ]
 
+    @tag('regression')  # Issue #18991
+    def test_front_port_paths(self):
+        device = Device.objects.first()
+        rear_port = RearPort.objects.create(
+            device=device, name='Rear Port 10', type=PortTypeChoices.TYPE_8P8C
+        )
+        interface1 = Interface.objects.create(device=device, name='Interface 1')
+        front_port = FrontPort.objects.create(
+            device=device,
+            name='Rear Port 10',
+            type=PortTypeChoices.TYPE_8P8C,
+            rear_port=rear_port,
+        )
+        Cable.objects.create(a_terminations=[interface1], b_terminations=[front_port])
+
+        self.add_permissions(f'dcim.view_{self.model._meta.model_name}')
+        url = reverse(f'dcim-api:{self.model._meta.model_name}-paths', kwargs={'pk': front_port.pk})
+        response = self.client.get(url, **self.header)
+
+        self.assertHttpStatus(response, status.HTTP_200_OK)
+
 
 class RearPortTest(APIViewTestCases.APIViewTestCase):
     model = RearPort
@@ -1946,6 +2064,23 @@ class RearPortTest(APIViewTestCases.APIViewTestCase):
                 'type': PortTypeChoices.TYPE_8P8C,
             },
         ]
+
+    @tag('regression')  # Issue #18991
+    def test_rear_port_paths(self):
+        device = Device.objects.first()
+        interface1 = Interface.objects.create(device=device, name='Interface 1')
+        rear_port = RearPort.objects.create(
+            device=device,
+            name='Rear Port 10',
+            type=PortTypeChoices.TYPE_8P8C,
+        )
+        Cable.objects.create(a_terminations=[interface1], b_terminations=[rear_port])
+
+        self.add_permissions(f'dcim.view_{self.model._meta.model_name}')
+        url = reverse(f'dcim-api:{self.model._meta.model_name}-paths', kwargs={'pk': rear_port.pk})
+        response = self.client.get(url, **self.header)
+
+        self.assertHttpStatus(response, status.HTTP_200_OK)
 
 
 class ModuleBayTest(APIViewTestCases.APIViewTestCase):

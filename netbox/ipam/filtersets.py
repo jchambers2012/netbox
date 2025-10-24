@@ -351,6 +351,18 @@ class PrefixFilterSet(NetBoxModelFilterSet, ScopedFilterSet, TenancyFilterSet, C
         to_field_name='rd',
         label=_('VRF (RD)'),
     )
+    vlan_group_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='vlan__group',
+        queryset=VLANGroup.objects.all(),
+        to_field_name="id",
+        label=_('VLAN Group (ID)'),
+    )
+    vlan_group = django_filters.ModelMultipleChoiceFilter(
+        field_name='vlan__group__slug',
+        queryset=VLANGroup.objects.all(),
+        to_field_name="slug",
+        label=_('VLAN Group (slug)'),
+    )
     vlan_id = django_filters.ModelMultipleChoiceFilter(
         queryset=VLAN.objects.all(),
         label=_('VLAN (ID)'),
@@ -437,7 +449,7 @@ class PrefixFilterSet(NetBoxModelFilterSet, ScopedFilterSet, TenancyFilterSet, C
     @extend_schema_field(OpenApiTypes.STR)
     def filter_present_in_vrf(self, queryset, name, vrf):
         if vrf is None:
-            return queryset.none
+            return queryset.none()
         return queryset.filter(
             Q(vrf=vrf) |
             Q(vrf__export_targets__in=vrf.import_targets.all())
@@ -492,7 +504,7 @@ class IPRangeFilterSet(TenancyFilterSet, NetBoxModelFilterSet, ContactModelFilte
 
     class Meta:
         model = IPRange
-        fields = ('id', 'mark_utilized', 'size', 'description')
+        fields = ('id', 'mark_populated', 'mark_utilized', 'size', 'description')
 
     def search(self, queryset, name, value):
         if not value.strip():
@@ -648,7 +660,7 @@ class IPAddressFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFil
     service_id = django_filters.ModelMultipleChoiceFilter(
         field_name='services',
         queryset=Service.objects.all(),
-        label=_('Service (ID)'),
+        label=_('Application Service (ID)'),
     )
     nat_inside_id = django_filters.ModelMultipleChoiceFilter(
         field_name='nat_inside',
@@ -717,7 +729,7 @@ class IPAddressFilterSet(NetBoxModelFilterSet, TenancyFilterSet, ContactModelFil
     @extend_schema_field(OpenApiTypes.STR)
     def filter_present_in_vrf(self, queryset, name, vrf):
         if vrf is None:
-            return queryset.none
+            return queryset.none()
         return queryset.filter(
             Q(vrf=vrf) |
             Q(vrf__export_targets__in=vrf.import_targets.all())
@@ -792,6 +804,7 @@ class FHRPGroupFilterSet(NetBoxModelFilterSet):
             return queryset
         return queryset.filter(
             Q(description__icontains=value) |
+            Q(group_id__contains=value) |
             Q(name__icontains=value)
         )
 
@@ -871,7 +884,7 @@ class FHRPGroupAssignmentFilterSet(ChangeLoggedModelFilterSet):
         )
 
 
-class VLANGroupFilterSet(OrganizationalModelFilterSet):
+class VLANGroupFilterSet(OrganizationalModelFilterSet, TenancyFilterSet):
     scope_type = ContentTypeFilter()
     region = django_filters.NumberFilter(
         method='filter_scope'
@@ -1151,25 +1164,35 @@ class ServiceTemplateFilterSet(NetBoxModelFilterSet):
 
 
 class ServiceFilterSet(ContactModelFilterSet, NetBoxModelFilterSet):
-    device_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=Device.objects.all(),
-        label=_('Device (ID)'),
-    )
-    device = django_filters.ModelMultipleChoiceFilter(
-        field_name='device__name',
-        queryset=Device.objects.all(),
-        to_field_name='name',
+    device = MultiValueCharFilter(
+        method='filter_device',
+        field_name='name',
         label=_('Device (name)'),
     )
-    virtual_machine_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=VirtualMachine.objects.all(),
+    device_id = MultiValueNumberFilter(
+        method='filter_device',
+        field_name='pk',
+        label=_('Device (ID)'),
+    )
+    virtual_machine = MultiValueCharFilter(
+        method='filter_virtual_machine',
+        field_name='name',
+        label=_('Virtual machine (name)'),
+    )
+    virtual_machine_id = MultiValueNumberFilter(
+        method='filter_virtual_machine',
+        field_name='pk',
         label=_('Virtual machine (ID)'),
     )
-    virtual_machine = django_filters.ModelMultipleChoiceFilter(
-        field_name='virtual_machine__name',
-        queryset=VirtualMachine.objects.all(),
-        to_field_name='name',
-        label=_('Virtual machine (name)'),
+    fhrpgroup = MultiValueCharFilter(
+        method='filter_fhrp_group',
+        field_name='name',
+        label=_('FHRP Group (name)'),
+    )
+    fhrpgroup_id = MultiValueNumberFilter(
+        method='filter_fhrp_group',
+        field_name='pk',
+        label=_('FHRP Group (ID)'),
     )
     ip_address_id = django_filters.ModelMultipleChoiceFilter(
         field_name='ipaddresses',
@@ -1189,13 +1212,40 @@ class ServiceFilterSet(ContactModelFilterSet, NetBoxModelFilterSet):
 
     class Meta:
         model = Service
-        fields = ('id', 'name', 'protocol', 'description')
+        fields = ('id', 'name', 'protocol', 'description', 'parent_object_type', 'parent_object_id')
 
     def search(self, queryset, name, value):
         if not value.strip():
             return queryset
         qs_filter = Q(name__icontains=value) | Q(description__icontains=value)
         return queryset.filter(qs_filter)
+
+    def filter_device(self, queryset, name, value):
+        devices = Device.objects.filter(**{'{}__in'.format(name): value})
+        if not devices.exists():
+            return queryset.none()
+        service_ids = []
+        for device in devices:
+            service_ids.extend(device.services.values_list('id', flat=True))
+        return queryset.filter(id__in=service_ids)
+
+    def filter_fhrp_group(self, queryset, name, value):
+        groups = FHRPGroup.objects.filter(**{'{}__in'.format(name): value})
+        if not groups.exists():
+            return queryset.none()
+        service_ids = []
+        for group in groups:
+            service_ids.extend(group.services.values_list('id', flat=True))
+        return queryset.filter(id__in=service_ids)
+
+    def filter_virtual_machine(self, queryset, name, value):
+        virtual_machines = VirtualMachine.objects.filter(**{'{}__in'.format(name): value})
+        if not virtual_machines.exists():
+            return queryset.none()
+        service_ids = []
+        for vm in virtual_machines:
+            service_ids.extend(vm.services.values_list('id', flat=True))
+        return queryset.filter(id__in=service_ids)
 
 
 class PrimaryIPFilterSet(django_filters.FilterSet):
@@ -1207,8 +1257,20 @@ class PrimaryIPFilterSet(django_filters.FilterSet):
         queryset=IPAddress.objects.all(),
         label=_('Primary IPv4 (ID)'),
     )
+    primary_ip4 = django_filters.ModelMultipleChoiceFilter(
+        field_name='primary_ip4__address',
+        queryset=IPAddress.objects.all(),
+        to_field_name='address',
+        label=_('Primary IPv4 (address)'),
+    )
     primary_ip6_id = django_filters.ModelMultipleChoiceFilter(
         field_name='primary_ip6',
         queryset=IPAddress.objects.all(),
         label=_('Primary IPv6 (ID)'),
+    )
+    primary_ip6 = django_filters.ModelMultipleChoiceFilter(
+        field_name='primary_ip6__address',
+        queryset=IPAddress.objects.all(),
+        to_field_name='address',
+        label=_('Primary IPv6 (address)'),
     )

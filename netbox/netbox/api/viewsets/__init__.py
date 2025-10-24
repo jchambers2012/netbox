@@ -2,14 +2,16 @@ import logging
 from functools import cached_property
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.db import transaction
+from django.db import router, transaction
 from django.db.models import ProtectedError, RestrictedError
 from django_pglocks import advisory_lock
 from netbox.constants import ADVISORY_LOCK_KEYS
 from rest_framework import mixins as drf_mixins
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from netbox.api.serializers.features import ChangeLogMessageSerializer
 from utilities.api import get_annotations_for_serializer, get_prefetches_for_serializer
 from utilities.exceptions import AbortRequest
 from utilities.query import reapply_model_ordering
@@ -170,7 +172,7 @@ class NetBoxModelViewSet(
 
         # Enforce object-level permissions on save()
         try:
-            with transaction.atomic():
+            with transaction.atomic(using=router.db_for_write(model)):
                 instance = serializer.save()
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
@@ -190,7 +192,7 @@ class NetBoxModelViewSet(
 
         # Enforce object-level permissions on save()
         try:
-            with transaction.atomic():
+            with transaction.atomic(using=router.db_for_write(model)):
                 instance = serializer.save()
                 self._validate_objects(instance)
         except ObjectDoesNotExist:
@@ -199,9 +201,16 @@ class NetBoxModelViewSet(
     # Deletes
 
     def destroy(self, request, *args, **kwargs):
-        # Hotwire get_object() to ensure we save a pre-change snapshot
-        self.get_object = self.get_object_with_snapshot
-        return super().destroy(request, *args, **kwargs)
+        instance = self.get_object_with_snapshot()
+
+        # Attach changelog message (if any)
+        serializer = ChangeLogMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance._changelog_message = serializer.validated_data.get('changelog_message')
+
+        self.perform_destroy(instance)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance):
         model = self.queryset.model

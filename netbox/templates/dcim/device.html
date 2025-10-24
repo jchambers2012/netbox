@@ -26,6 +26,12 @@
                         <th scope="row">{% trans "Location" %}</th>
                         <td>{% nested_tree object.location %}</td>
                     </tr>
+                    {% if object.virtual_chassis %}
+                      <tr>
+                        <th scope="row">{% trans "Virtual Chassis" %}</th>
+                        <td>{{ object.virtual_chassis|linkify }}</td>
+                      </tr>
+                    {% endif %}
                     <tr>
                         <th scope="row">{% trans "Rack" %}</th>
                         <td class="d-flex justify-content-between align-items-start">
@@ -299,11 +305,11 @@
             {% endif %}
             <div class="card">
               <h2 class="card-header">
-                {% trans "Services" %}
+                {% trans "Application Services" %}
                 {% if perms.ipam.add_service %}
                   <div class="card-actions">
-                    <a href="{% url 'ipam:service_add' %}?device={{ object.pk }}" class="btn btn-ghost-primary btn-sm">
-                      <span class="mdi mdi-plus-thick" aria-hidden="true"></span> {% trans "Add a service" %}
+                    <a href="{% url 'ipam:service_add' %}?parent_object_type={{ object|content_type_id }}&parent={{ object.pk }}" class="btn btn-ghost-primary btn-sm">
+                      <span class="mdi mdi-plus-thick" aria-hidden="true"></span> {% trans "Add an application service" %}
                     </a>
                   </div>
                 {% endif %}

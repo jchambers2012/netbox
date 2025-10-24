@@ -2,7 +2,10 @@
 
 ## ALLOW_TOKEN_RETRIEVAL
 
-Default: True
+Default: `False`
+
+!!! note
+    The default value of this parameter changed from `True` to `False` in NetBox v4.3.0.
 
 If disabled, the values of API tokens will not be displayed after each token's initial creation. A user **must** record the value of a token prior to its creation, or it will be lost. Note that this affects _all_ users, regardless of assigned permissions.
 
@@ -47,9 +50,9 @@ Although it is not recommended, the default validation rules can be disabled by 
 
 ## CORS_ORIGIN_ALLOW_ALL
 
-Default: False
+Default: `False`
 
-If True, cross-origin resource sharing (CORS) requests will be accepted from all origins. If False, a whitelist will be used (see below).
+If `True`, cross-origin resource sharing (CORS) requests will be accepted from all origins. If False, a whitelist will be used (see below).
 
 ---
 
@@ -59,7 +62,7 @@ If True, cross-origin resource sharing (CORS) requests will be accepted from all
 
 These settings specify a list of origins that are authorized to make cross-site API requests. Use
 `CORS_ORIGIN_WHITELIST` to define a list of exact hostnames, or `CORS_ORIGIN_REGEX_WHITELIST` to define a set of regular 
-expressions. (These settings have no effect if `CORS_ORIGIN_ALLOW_ALL` is True.) For example:
+expressions. (These settings have no effect if `CORS_ORIGIN_ALLOW_ALL` is `True`.) For example:
 
 ```python
 CORS_ORIGIN_WHITELIST = [
@@ -79,9 +82,9 @@ The name of the cookie to use for the cross-site request forgery (CSRF) authenti
 
 ## CSRF_COOKIE_SECURE
 
-Default: False
+Default: `False`
 
-If true, the cookie employed for cross-site request forgery (CSRF) protection will be marked as secure, meaning that it can only be sent across an HTTPS connection.
+If `True`, the cookie employed for cross-site request forgery (CSRF) protection will be marked as secure, meaning that it can only be sent across an HTTPS connection.
 
 ---
 
@@ -89,7 +92,7 @@ If true, the cookie employed for cross-site request forgery (CSRF) protection wi
 
 Default: `[]`
 
-Defines a list of trusted origins for unsafe (e.g. `POST`) requests. This is a pass-through to Django's [`CSRF_TRUSTED_ORIGINS`](https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS) setting. Note that each host listed must specify a scheme (e.g. `http://` or `https://).
+Defines a list of trusted origins for unsafe (e.g. `POST`) requests. This is a pass-through to Django's [`CSRF_TRUSTED_ORIGINS`](https://docs.djangoproject.com/en/stable/ref/settings/#csrf-trusted-origins) setting. Note that each host listed must specify a scheme (e.g. `http://` or `https://).
 
 ```python
 CSRF_TRUSTED_ORIGINS = (
@@ -132,7 +135,7 @@ DEFAULT_PERMISSIONS = {
 
 ## EXEMPT_VIEW_PERMISSIONS
 
-Default: Empty list
+Default: `[]` (Empty list)
 
 A list of NetBox models to exempt from the enforcement of view permissions. Models listed here will be viewable by all users, both authenticated and anonymous.
 
@@ -159,9 +162,9 @@ EXEMPT_VIEW_PERMISSIONS = ['*']
 
 ## LOGIN_PERSISTENCE
 
-Default: False
+Default: `False`
 
-If true, the lifetime of a user's authentication session will be automatically reset upon each valid request. For example, if [`LOGIN_TIMEOUT`](#login_timeout) is configured to 14 days (the default), and a user whose session is due to expire in five days makes a NetBox request (with a valid session cookie), the session's lifetime will be reset to 14 days.
+If `True`, the lifetime of a user's authentication session will be automatically reset upon each valid request. For example, if [`LOGIN_TIMEOUT`](#login_timeout) is configured to 14 days (the default), and a user whose session is due to expire in five days makes a NetBox request (with a valid session cookie), the session's lifetime will be reset to 14 days.
 
 Note that enabling this setting causes NetBox to update a user's session in the database (or file, as configured per [`SESSION_FILE_PATH`](#session_file_path)) with each request, which may introduce significant overhead in very active environments. It also permits an active user to remain authenticated to NetBox indefinitely.
 
@@ -169,7 +172,7 @@ Note that enabling this setting causes NetBox to update a user's session in the 
 
 ## LOGIN_REQUIRED
 
-Default: True
+Default: `True`
 
 When enabled, only authenticated users are permitted to access any part of NetBox. Disabling this will allow unauthenticated users to access most areas of NetBox (but not make any changes).
 
@@ -180,9 +183,20 @@ When enabled, only authenticated users are permitted to access any part of NetBo
 
 ## LOGIN_TIMEOUT
 
-Default: 1209600 seconds (14 days)
+Default: `1209600` seconds (14 days)
 
 The lifetime (in seconds) of the authentication cookie issued to a NetBox user upon login.
+
+---
+
+## LOGIN_FORM_HIDDEN
+
+Default: `False`
+
+Option to hide the login form when only SSO authentication is in use. 
+
+!!! warning
+    If the SSO provider is unreachable, login to NetBox will be impossible if this option is enabled. The only recourse is to disable it in the local configuration and restart the NetBox service.
 
 ---
 
@@ -196,23 +210,23 @@ The view name or URL to which a user is redirected after logging out.
 
 ## SECURE_HSTS_INCLUDE_SUBDOMAINS
 
-Default: False
+Default: `False`
 
-If true, the `includeSubDomains` directive will be included in the HTTP Strict Transport Security (HSTS) header. This directive instructs the browser to apply the HSTS policy to all subdomains of the current domain.
+If `True`, the `includeSubDomains` directive will be included in the HTTP Strict Transport Security (HSTS) header. This directive instructs the browser to apply the HSTS policy to all subdomains of the current domain.
 
 ---
 
 ## SECURE_HSTS_PRELOAD
 
-Default: False
+Default: `False`
 
-If true, the `preload` directive will be included in the HTTP Strict Transport Security (HSTS) header. This directive instructs the browser to preload the site in HTTPS. Browsers that use the HSTS preload list will force the site to be accessed via HTTPS even if the user types HTTP in the address bar.
+If `True`, the `preload` directive will be included in the HTTP Strict Transport Security (HSTS) header. This directive instructs the browser to preload the site in HTTPS. Browsers that use the HSTS preload list will force the site to be accessed via HTTPS even if the user types HTTP in the address bar.
 
 ---
 
 ## SECURE_HSTS_SECONDS
 
-Default: 0
+Default: `0`
 
 If set to a non-zero integer value, the SecurityMiddleware sets the HTTP Strict Transport Security (HSTS) header on all responses that do not already have it. This will instruct the browser that the website must be accessed via HTTPS, blocking any HTTP request.
 
@@ -220,9 +234,9 @@ If set to a non-zero integer value, the SecurityMiddleware sets the HTTP Strict 
 
 ## SECURE_SSL_REDIRECT
 
-Default: False
+Default: `False`
 
-If true, all non-HTTPS requests will be automatically redirected to use HTTPS.
+If `True`, all non-HTTPS requests will be automatically redirected to use HTTPS.
 
 !!! warning
     Ensure that your frontend HTTP daemon has been configured to forward the HTTP scheme correctly before enabling this option. An incorrectly configured frontend may result in a looping redirect.
@@ -239,14 +253,14 @@ The name used for the session cookie. See the [Django documentation](https://doc
 
 ## SESSION_COOKIE_SECURE
 
-Default: False
+Default: `False`
 
-If true, the cookie employed for session authentication will be marked as secure, meaning that it can only be sent across an HTTPS connection.
+If `True`, the cookie employed for session authentication will be marked as secure, meaning that it can only be sent across an HTTPS connection.
 
 ---
 
 ## SESSION_FILE_PATH
 
-Default: None
+Default: `None`
 
 HTTP session data is used to track authenticated users when they access NetBox. By default, NetBox stores session data in its PostgreSQL database. However, this inhibits authentication to a standby instance of NetBox without write access to the database. Alternatively, a local file path may be specified here and NetBox will store session data as files instead of using the database. Note that the NetBox system user must have read and write permissions to this path.

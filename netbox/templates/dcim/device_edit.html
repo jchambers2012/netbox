@@ -3,7 +3,9 @@
 {% load i18n %}
 
 {% block form %}
-    {% render_errors form %}
+    {% for field in form.hidden_fields %}
+      {{ field }}
+    {% endfor %}
 
     <div class="field-group my-5">
       <div class="row">
@@ -113,6 +115,11 @@
 
     <div class="field-group mb-5">
       {% render_field form.comments %}
+    </div>
+
+    {# Meta fields #}
+    <div class="bg-primary-subtle border border-primary rounded-1 pt-3 px-3 mb-3">
+      {% render_field form.changelog_message %}
     </div>
 
 {% endblock %}

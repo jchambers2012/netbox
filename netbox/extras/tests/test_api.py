@@ -2,8 +2,7 @@ import datetime
 
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
-from django.utils.timezone import make_aware
-from rest_framework import status
+from django.utils.timezone import make_aware, now
 
 from core.choices import ManagedFileRootPathChoices
 from core.events import *
@@ -479,6 +478,7 @@ class ExportTemplateTest(APIViewTestCases.APIViewTestCase):
             'object_types': ['dcim.device'],
             'name': 'Test Export Template 6',
             'template_code': '{% for obj in queryset %}{{ obj.name }}\n{% endfor %}',
+            'file_name': 'test_export_template_6',
         },
     ]
     bulk_update_data = {
@@ -494,7 +494,9 @@ class ExportTemplateTest(APIViewTestCases.APIViewTestCase):
             ),
             ExportTemplate(
                 name='Export Template 2',
-                template_code='{% for obj in queryset %}{{ obj.name }}\n{% endfor %}'
+                template_code='{% for obj in queryset %}{{ obj.name }}\n{% endfor %}',
+                file_name='export_template_2',
+                file_extension='test',
             ),
             ExportTemplate(
                 name='Export Template 3',
@@ -502,8 +504,10 @@ class ExportTemplateTest(APIViewTestCases.APIViewTestCase):
             ),
         )
         ExportTemplate.objects.bulk_create(export_templates)
+
+        device_object_type = ObjectType.objects.get_for_model(Device)
         for et in export_templates:
-            et.object_types.set([ObjectType.objects.get_for_model(Device)])
+            et.object_types.set([device_object_type])
 
 
 class TagTest(APIViewTestCases.APIViewTestCase):
@@ -513,6 +517,7 @@ class TagTest(APIViewTestCases.APIViewTestCase):
         {
             'name': 'Tag 4',
             'slug': 'tag-4',
+            'weight': 1000,
         },
         {
             'name': 'Tag 5',
@@ -533,9 +538,37 @@ class TagTest(APIViewTestCases.APIViewTestCase):
         tags = (
             Tag(name='Tag 1', slug='tag-1'),
             Tag(name='Tag 2', slug='tag-2'),
+            Tag(name='Tag 3', slug='tag-3', weight=26),
+        )
+        Tag.objects.bulk_create(tags)
+
+
+class TaggedItemTest(
+    APIViewTestCases.GetObjectViewTestCase,
+    APIViewTestCases.ListObjectsViewTestCase
+):
+    model = TaggedItem
+    brief_fields = ['display', 'id', 'object', 'object_id', 'object_type', 'tag', 'url']
+
+    @classmethod
+    def setUpTestData(cls):
+
+        tags = (
+            Tag(name='Tag 1', slug='tag-1'),
+            Tag(name='Tag 2', slug='tag-2'),
             Tag(name='Tag 3', slug='tag-3'),
         )
         Tag.objects.bulk_create(tags)
+
+        sites = (
+            Site(name='Site 1', slug='site-1'),
+            Site(name='Site 2', slug='site-2'),
+            Site(name='Site 3', slug='site-3'),
+        )
+        Site.objects.bulk_create(sites)
+        sites[0].tags.set([tags[0], tags[1]])
+        sites[1].tags.set([tags[1], tags[2]])
+        sites[2].tags.set([tags[2], tags[0]])
 
 
 # TODO: Standardize to APIViewTestCase (needs create & update tests)
@@ -546,7 +579,7 @@ class ImageAttachmentTest(
     APIViewTestCases.GraphQLTestCase
 ):
     model = ImageAttachment
-    brief_fields = ['display', 'id', 'image', 'name', 'url']
+    brief_fields = ['description', 'display', 'id', 'image', 'name', 'url']
 
     @classmethod
     def setUpTestData(cls):
@@ -631,6 +664,70 @@ class JournalEntryTest(APIViewTestCases.APIViewTestCase):
                 'comments': 'Third entry',
             },
         ]
+
+
+class ConfigContextProfileTest(APIViewTestCases.APIViewTestCase):
+    model = ConfigContextProfile
+    brief_fields = ['description', 'display', 'id', 'name', 'url']
+    create_data = [
+        {
+            'name': 'Config Context Profile 4',
+        },
+        {
+            'name': 'Config Context Profile 5',
+        },
+        {
+            'name': 'Config Context Profile 6',
+        },
+    ]
+    bulk_update_data = {
+        'description': 'New description',
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        profiles = (
+            ConfigContextProfile(
+                name='Config Context Profile 1',
+                schema={
+                    "properties": {
+                        "foo": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "foo"
+                    ]
+                }
+            ),
+            ConfigContextProfile(
+                name='Config Context Profile 2',
+                schema={
+                    "properties": {
+                        "bar": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "bar"
+                    ]
+                }
+            ),
+            ConfigContextProfile(
+                name='Config Context Profile 3',
+                schema={
+                    "properties": {
+                        "baz": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "baz"
+                    ]
+                }
+            ),
+        )
+        ConfigContextProfile.objects.bulk_create(profiles)
 
 
 class ConfigContextTest(APIViewTestCases.APIViewTestCase):
@@ -721,6 +818,10 @@ class ConfigTemplateTest(APIViewTestCases.APIViewTestCase):
         {
             'name': 'Config Template 4',
             'template_code': 'Foo: {{ foo }}',
+            'mime_type': 'text/plain',
+            'file_name': 'output4',
+            'file_extension': 'txt',
+            'as_attachment': True,
         },
         {
             'name': 'Config Template 5',
@@ -744,7 +845,7 @@ class ConfigTemplateTest(APIViewTestCases.APIViewTestCase):
             ),
             ConfigTemplate(
                 name='Config Template 2',
-                template_code='Bar: {{ bar }}'
+                template_code='Bar: {{ bar }}',
             ),
             ConfigTemplate(
                 name='Config Template 3',
@@ -883,22 +984,6 @@ class CreatedUpdatedFilterTest(APITestCase):
         self.assertEqual(response.data['results'][0]['id'], rack2.pk)
 
 
-class ObjectTypeTest(APITestCase):
-
-    def test_list_objects(self):
-        object_type_count = ObjectType.objects.count()
-
-        response = self.client.get(reverse('extras-api:objecttype-list'), **self.header)
-        self.assertHttpStatus(response, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], object_type_count)
-
-    def test_get_object(self):
-        object_type = ObjectType.objects.first()
-
-        url = reverse('extras-api:objecttype-detail', kwargs={'pk': object_type.pk})
-        self.assertHttpStatus(self.client.get(url, **self.header), status.HTTP_200_OK)
-
-
 class SubscriptionTest(APIViewTestCases.APIViewTestCase):
     model = Subscription
     brief_fields = ['display', 'id', 'object_id', 'object_type', 'url', 'user']
@@ -952,6 +1037,10 @@ class SubscriptionTest(APIViewTestCases.APIViewTestCase):
                 'user': users[3].pk,
             },
         ]
+
+        cls.bulk_update_data = {
+            'user': users[3].pk,
+        }
 
 
 class NotificationGroupTest(APIViewTestCases.APIViewTestCase):
@@ -1034,6 +1123,9 @@ class NotificationGroupTest(APIViewTestCases.APIViewTestCase):
 class NotificationTest(APIViewTestCases.APIViewTestCase):
     model = Notification
     brief_fields = ['display', 'event_type', 'id', 'object_id', 'object_type', 'read', 'url', 'user']
+    bulk_update_data = {
+        'read': now(),
+    }
 
     @classmethod
     def setUpTestData(cls):

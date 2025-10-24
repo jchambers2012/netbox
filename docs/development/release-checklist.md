@@ -1,12 +1,12 @@
 # Release Checklist
 
-This documentation describes the process of packaging and publishing a new NetBox release. There are three types of release:
+This documentation describes the process of packaging and publishing a new NetBox release. There are three types of releases:
 
 * Major release (e.g. v3.7.8 to v4.0.0)
 * Minor release (e.g. v4.0.10 to v4.1.0)
 * Patch release (e.g. v4.1.0 to v4.1.1)
 
-While major releases generally introduce some very substantial change to the application, they are typically treated the same as minor version increments for the purpose of release packaging.
+While major releases generally introduce some very substantial changes to the application, they are typically treated the same as minor version increments for the purpose of release packaging.
 
 For patch releases (e.g. upgrading from v4.2.2 to v4.2.3), begin at the [patch releases](#patch-releases) heading below. For minor or major releases, complete the entire checklist.
 
@@ -31,6 +31,17 @@ Close the [release milestone](https://github.com/netbox-community/netbox/milesto
 
 Check that a link to the release notes for the new version is present in the navigation menu (defined in `mkdocs.yml`), and that a summary of all major new features has been added to `docs/index.md`.
 
+### Update System Requirements
+
+If a new Django release is adopted or other major dependencies (Python, PostgreSQL, Redis) change:
+
+* Update the installation guide (`docs/installation/index.md`) with the new minimum versions.
+* Update the upgrade guide (`docs/installation/upgrading.md`) for the current version.
+    * Update the minimum versions for each dependency.
+    * Add a new row to the release history table. Bold any version changes for clarity.
+* Update the minimum PostgreSQL version in the programming error template (`netbox/templates/exceptions/programming_error.html`).
+* Update the minimum and supported Python versions in the project metadata file (`pyproject.toml`)
+
 ### Manually Perform a New Install
 
 Start the documentation server and navigate to the current version of the installation docs:
@@ -39,15 +50,25 @@ Start the documentation server and navigate to the current version of the instal
 mkdocs serve
 ```
 
-Follow these instructions to perform a new installation of NetBox in a temporary environment. This process must not be automated: The goal of this step is to catch any errors or omissions in the documentation, and ensure that it is kept up-to-date for each release. Make any necessary changes to the documentation before proceeding with the release.
+Follow these instructions to perform a new installation of NetBox in a temporary environment. This process must not be automated: The goal of this step is to catch any errors or omissions in the documentation and ensure that it is kept up to date for each release. Make any necessary changes to the documentation before proceeding with the release.
 
 ### Test Upgrade Paths
 
-Upgrading from a previous version typically involves database migrations, which must work without errors. Supported upgrade paths include from one minor version to another within the same major version (i.e. 4.0 to 4.1), as well as from the latest patch version of the previous minor version (i.e. 3.7 to 4.0 or to 4.1). Prior to release, test all these supported paths by loading demo data from the source version and performing a `./manage.py migrate`.
+Upgrading from a previous version typically involves database migrations, which must work without errors.
+Test the following supported upgrade paths:
+
+- From one minor version to another within the same major version (e.g. 4.0 to 4.1).
+- From the latest patch version of the previous minor version (e.g. 3.7 to 4.0 or 4.1).
+
+Prior to release, test all these supported paths by loading demo data from the source version and performing:
+
+```no-highlight
+./manage.py migrate
+```
 
 ### Merge the `feature` Branch
 
-Submit a pull request to merge the `feature` branch into the `main` branch in preparation for its release. Once it has been merged, continue with the section for patch releases below.
+Submit a pull request to merge the `feature` branch into the `main` branch in preparation for its release. Once it has been merged, continue with the section for the patch releases below.
 
 ### Rebuild Demo Data (After Release)
 
@@ -59,7 +80,7 @@ After the release of a new minor version, generate a new demo data snapshot comp
 
 ### Create a Release Branch
 
-Begin by creating a new branch (based off of `main`) to effect the release. This will comprise the changes listed below.
+Begin by creating a new branch (based on `main`) to effect the release. This will comprise the changes listed below.
 
 ```
 git checkout main
@@ -102,22 +123,12 @@ $ node bundle.js
 Done in 1.00s.
 ```
 
-### Rebuild the Device Type Definition Schema
-
-Run the following command to update the device type definition validation schema:
-
-```nohighlight
-./manage.py buildschema --write
-```
-
-This will automatically update the schema file at `contrib/generated_schema.json`.
-
 ### Update & Compile Translations
 
 Updated language translations should be pulled from [Transifex](https://app.transifex.com/netbox-community/netbox/dashboard/) and re-compiled for each new release. First, retrieve any updated translation files using the Transifex CLI client:
 
 ```no-highlight
-tx pull
+tx pull --force
 ```
 
 Then, compile these portable (`.po`) files for use in the application:
@@ -131,12 +142,31 @@ Then, compile these portable (`.po`) files for use in the application:
 
 ### Update Version and Changelog
 
-* Update the version number and date in `netbox/release.yaml`. Add or remove the designation (e.g. `beta1`) if applicable.
+* Update the version number and published date in `netbox/release.yaml`. Add or remove the designation (e.g. `beta1`) if applicable.
+* Copy the version number from `release.yaml` to `pyproject.toml` in the project root.
 * Update the example version numbers in the feature request and bug report templates under `.github/ISSUE_TEMPLATES/`.
 * Add a section for this release at the top of the changelog page for the minor version (e.g. `docs/release-notes/version-4.2.md`) listing all relevant changes made in this release.
 
 !!! tip
-    Put yourself in the shoes of the user when recording change notes. Focus on the effect that each change has for the end user, rather than the specific bits of code that were modified in a PR. Ensure that each message conveys meaning absent context of the initial feature request or bug report. Remember to include key words or phrases (such as exception names) that can be easily searched.
+    Put yourself in the shoes of the user when recording change notes. Focus on the effect that each change has for the end user, rather than the specific bits of code that were modified in a PR. Ensure that each message conveys meaning absent context of the initial feature request or bug report. Remember to include keywords or phrases (such as exception names) that can be easily searched.
+
+### Rebuild the Device Type Definition Schema
+
+Run the following command to update the device type definition validation schema:
+
+```nohighlight
+./manage.py buildschema --write
+```
+
+This will automatically update the schema file at `contrib/generated_schema.json`.
+
+### Update the OpenAPI Schema
+
+Update the static OpenAPI schema definition at `contrib/openapi.json` with the management command below. If the schema file is up-to-date, only the NetBox version will be changed.
+
+```nohighlight
+./manage.py spectacular --format openapi-json > ../contrib/openapi.json
+```
 
 ### Submit a Pull Request
 
@@ -157,15 +187,3 @@ Create a [new release](https://github.com/netbox-community/netbox/releases/new) 
 * **Description:** Copy from the pull request body, then promote the `###` headers to `##` ones
 
 Once created, the release will become available for users to install.
-
-### Update the Public Documentation
-
-After a release has been published, the public NetBox documentation needs to be updated. This is accomplished by running two actions on the [netboxlabs-docs](https://github.com/netboxlabs/netboxlabs-docs) repository.
-
-First, run the `build-site` action, by navigating to Actions > build-site > Run workflow. This process compiles the documentation along with an overlay for integration with the documentation portal at <https://netboxlabs.com/docs>. The job should take about two minutes.
-
-Once the documentation files have been compiled, they must be published by running the `deploy-kinsta` action. Select the desired deployment environment (staging or production) and specify `latest` as the deploy tag.
-
-Clear the CDN cache from the [Kinsta](https://my.kinsta.com/) portal. Navigate to _Sites_ / _NetBox Labs_ / _Live_, select _Cache_ in the left-nav, click the _Clear Cache_ button, and confirm the clear operation.
-
-Finally, verify that the documentation at <https://netboxlabs.com/docs/netbox/en/stable/> has been updated.

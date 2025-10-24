@@ -20,10 +20,13 @@
         <th scope="row">{{ terminations.0|meta:"verbose_name"|capfirst }}</th>
         <td>
           {% for term in terminations %}
-	    {{term.device|linkify}}
-	    <i class="mdi mdi-chevron-right" aria-hidden="true"></i>
-	    {{ term|linkify }}
-	    {% if not forloop.last %}<br/>{% endif %}
+            {{ term.device|linkify }}
+            <i class="mdi mdi-chevron-right" aria-hidden="true"></i>
+            {{ term|linkify }}
+            <a href="{% action_url term 'trace' pk=term.pk %}" class="btn btn-sm btn-primary" title="{% trans "Trace" %}">
+              <i class="mdi mdi-transit-connection-variant" aria-hidden="true"></i>
+            </a>
+            {% if not forloop.last %}<br/>{% endif %}
           {% endfor %}
         </td>
       </tr>
@@ -41,7 +44,11 @@
         <th scope="row">{{ terminations.0|meta:"verbose_name"|capfirst }}</th>
         <td>
           {% for term in terminations %}
-            {{ term|linkify }}{% if not forloop.last %},{% endif %}
+            {{ term|linkify }}
+            <a href="{% action_url term 'trace' pk=term.pk %}" class="btn btn-sm btn-primary" title="{% trans "Trace" %}">
+              <i class="mdi mdi-transit-connection-variant" aria-hidden="true"></i>
+            </a>
+            {% if not forloop.last %}<br/>{% endif %}
           {% endfor %}
         </td>
       </tr>
@@ -55,7 +62,11 @@
         <th scope="row">{% trans "Circuit" %}</th>
         <td>
           {% for term in terminations %}
-            {{ term.circuit|linkify }} ({{ term }}){% if not forloop.last %},{% endif %}
+            {{ term.circuit|linkify }} ({{ term }})
+            <a href="{% action_url term 'trace' pk=term.pk %}" class="btn btn-sm btn-primary" title="{% trans "Trace" %}">
+              <i class="mdi mdi-transit-connection-variant" aria-hidden="true"></i>
+            </a>
+            {% if not forloop.last %}<br/>{% endif %}
           {% endfor %}
         </td>
       </tr>

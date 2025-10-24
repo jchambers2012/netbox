@@ -12,7 +12,7 @@
 
 {% block content %}
     <div class="row">
-        <div class="col col-md-6">
+        <div class="col col-12 col-md-6">
             <div class="card">
                 <h2 class="card-header">{% trans "Rear Port" %}</h2>
                 <table class="table table-hover attr-table">
@@ -60,7 +60,7 @@
             {% include 'inc/panels/tags.html' %}
             {% plugin_left_page object %}
         </div>
-        <div class="col col-md-6">
+        <div class="col col-12 col-md-6">
             <div class="card">
                 <h2 class="card-header">{% trans "Connection" %}</h2>
                 {% if object.mark_connected %}
@@ -73,7 +73,7 @@
                             <th scope="row">{% trans "Cable" %}</th>
                             <td>
                                 {{ object.cable|linkify }}
-                                <a href="{% url 'dcim:rearport_trace' pk=object.pk %}" class="btn btn-primary lh-1" title="{% trans "Trace" %}">
+                                <a href="{% url 'dcim:rearport_trace' pk=object.pk %}" class="btn btn-sm btn-primary" title="{% trans "Trace" %}">
                                     <i class="mdi mdi-transit-connection-variant" aria-hidden="true"></i>
                                 </a>
                             </td>

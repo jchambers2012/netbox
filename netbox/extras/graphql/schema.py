@@ -11,6 +11,9 @@ class ExtrasQuery:
     config_context: ConfigContextType = strawberry_django.field()
     config_context_list: List[ConfigContextType] = strawberry_django.field()
 
+    config_context_profile: ConfigContextProfileType = strawberry_django.field()
+    config_context_profile_list: List[ConfigContextProfileType] = strawberry_django.field()
+
     config_template: ConfigTemplateType = strawberry_django.field()
     config_template_list: List[ConfigTemplateType] = strawberry_django.field()
 
@@ -31,6 +34,9 @@ class ExtrasQuery:
 
     saved_filter: SavedFilterType = strawberry_django.field()
     saved_filter_list: List[SavedFilterType] = strawberry_django.field()
+
+    table_config: TableConfigType = strawberry_django.field()
+    table_config_list: List[TableConfigType] = strawberry_django.field()
 
     journal_entry: JournalEntryType = strawberry_django.field()
     journal_entry_list: List[JournalEntryType] = strawberry_django.field()

@@ -29,9 +29,18 @@ An alternative physical label identifying the power outlet.
 
 The type of power outlet.
 
-### Color
+### Status
 
-!!! info "This field was introduced in NetBox v4.2."
+The operational status of the power outlet. By default, the following statuses are available:
+
+* Enabled
+* Disabled
+* Faulty
+
+!!! tip "Custom power outlet statuses"
+    Additional power outlet statuses may be defined by setting `PowerOutlet.status` under the [`FIELD_CHOICES`](../../configuration/data-validation.md#field_choices) configuration parameter.
+
+### Color
 
 The power outlet's color (optional).
 

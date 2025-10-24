@@ -7,7 +7,7 @@
 
 {% block content %}
 <div class="row my-3">
-	<div class="col col-md-6">
+	<div class="col col-12 col-md-6">
         <div class="card">
             <h2 class="card-header">{% trans "Virtual Machine" %}</h2>
             <table class="table table-hover attr-table">
@@ -87,7 +87,7 @@
         {% include 'inc/panels/comments.html' %}
         {% plugin_left_page object %}
     </div>
-	<div class="col col-md-6">
+	<div class="col col-12 col-md-6">
         <div class="card">
             <h2 class="card-header">{% trans "Cluster" %}</h2>
             <table class="table table-hover attr-table">
@@ -151,11 +151,11 @@
         </div>
         <div class="card">
           <h2 class="card-header">
-            {% trans "Services" %}
+            {% trans "Application Services" %}
             {% if perms.ipam.add_service %}
               <div class="card-actions">
-                <a href="{% url 'ipam:service_add' %}?virtual_machine={{ object.pk }}" class="btn btn-ghost-primary btn-sm">
-                  <span class="mdi mdi-plus-thick" aria-hidden="true"></span> {% trans "Add a service" %}
+                <a href="{% url 'ipam:service_add' %}?parent_object_type={{ object|content_type_id }}&parent={{ object.pk }}" class="btn btn-ghost-primary btn-sm">
+                  <span class="mdi mdi-plus-thick" aria-hidden="true"></span> {% trans "Add an application service" %}
                 </a>
               </div>
             {% endif %}

@@ -203,13 +203,15 @@ class VirtualMachineTestCase(ViewTestCases.PrimaryObjectViewTestCase):
             DeviceRole(name='Device Role 1', slug='device-role-1'),
             DeviceRole(name='Device Role 2', slug='device-role-2'),
         )
-        DeviceRole.objects.bulk_create(roles)
+        for role in roles:
+            role.save()
 
         platforms = (
             Platform(name='Platform 1', slug='platform-1'),
             Platform(name='Platform 2', slug='platform-2'),
         )
-        Platform.objects.bulk_create(platforms)
+        for platform in platforms:
+            platform.save()
 
         sites = (
             Site(name='Site 1', slug='site-1'),

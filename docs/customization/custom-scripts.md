@@ -140,6 +140,8 @@ The Script class provides two convenience methods for reading data from files:
 
 These two methods will load data in YAML or JSON format, respectively, from files within the local path (i.e. `SCRIPTS_ROOT`).
 
+**Note:** These convenience methods are deprecated and will be removed in NetBox v4.4.  These only work if running scripts within the local path, they will not work if using a storage other than ScriptFileSystemStorage.
+
 ## Logging
 
 The Script object provides a set of convenient functions for recording messages at different severity levels:
@@ -272,6 +274,15 @@ Stores a numeric integer. Options include:
 
 * `min_value` - Minimum value
 * `max_value` - Maximum value
+
+### DecimalVar
+
+Stores a numeric decimal. Options include:
+
+* `min_value` - Minimum value
+* `max_value` - Maximum value
+* `max_digits` - Maximum number of digits, including decimal places
+* `decimal_places` - Number of decimal places
 
 ### BooleanVar
 

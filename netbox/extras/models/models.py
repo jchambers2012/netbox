@@ -1,32 +1,35 @@
 import json
 import urllib.parse
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import ValidationError
 from django.db import models
-from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from rest_framework.utils.encoders import JSONEncoder
 
-from core.models import ObjectType
 from extras.choices import *
-from extras.conditions import ConditionSet
+from extras.conditions import ConditionSet, InvalidCondition
 from extras.constants import *
+from extras.models.mixins import RenderTemplateMixin
 from extras.utils import image_upload
 from netbox.config import get_config
 from netbox.events import get_event_type_choices
 from netbox.models import ChangeLoggedModel
 from netbox.models.features import (
-    CloningMixin, CustomFieldsMixin, CustomLinksMixin, ExportTemplatesMixin, SyncedDataMixin, TagsMixin,
+    CloningMixin, CustomFieldsMixin, CustomLinksMixin, ExportTemplatesMixin, SyncedDataMixin, TagsMixin, has_feature
 )
 from utilities.html import clean_html
 from utilities.jinja2 import render_jinja2
 from utilities.querydict import dict_to_querydict
 from utilities.querysets import RestrictedQuerySet
+from utilities.tables import get_table_for_model
 
 __all__ = (
     'Bookmark',
@@ -36,6 +39,7 @@ __all__ = (
     'ImageAttachment',
     'JournalEntry',
     'SavedFilter',
+    'TableConfig',
     'Webhook',
 )
 
@@ -47,7 +51,7 @@ class EventRule(CustomFieldsMixin, ExportTemplatesMixin, TagsMixin, ChangeLogged
     webhook or executing a custom script.
     """
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='event_rules',
         verbose_name=_('object types'),
         help_text=_("The object(s) to which this rule applies.")
@@ -140,7 +144,15 @@ class EventRule(CustomFieldsMixin, ExportTemplatesMixin, TagsMixin, ChangeLogged
         if not self.conditions:
             return True
 
-        return ConditionSet(self.conditions).eval(data)
+        logger = logging.getLogger('netbox.event_rules')
+
+        try:
+            result = ConditionSet(self.conditions).eval(data)
+            logger.debug(f'{self.name}: Evaluated as {result}')
+            return result
+        except InvalidCondition as e:
+            logger.error(f"{self.name}: Evaluation failed. {e}")
+            return False
 
 
 class Webhook(CustomFieldsMixin, ExportTemplatesMixin, TagsMixin, ChangeLoggedModel):
@@ -288,7 +300,7 @@ class CustomLink(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
     code to be rendered with an object as context.
     """
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='custom_links',
         help_text=_('The object type(s) to which this link applies.')
     )
@@ -382,9 +394,9 @@ class CustomLink(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         }
 
 
-class ExportTemplate(SyncedDataMixin, CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
+class ExportTemplate(SyncedDataMixin, CloningMixin, ExportTemplatesMixin, ChangeLoggedModel, RenderTemplateMixin):
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='export_templates',
         help_text=_('The object type(s) to which this template applies.')
     )
@@ -397,32 +409,9 @@ class ExportTemplate(SyncedDataMixin, CloningMixin, ExportTemplatesMixin, Change
         max_length=200,
         blank=True
     )
-    template_code = models.TextField(
-        help_text=_(
-            "Jinja2 template code. The list of objects being exported is passed as a context variable named "
-            "<code>queryset</code>."
-        )
-    )
-    mime_type = models.CharField(
-        max_length=50,
-        blank=True,
-        verbose_name=_('MIME type'),
-        help_text=_('Defaults to <code>text/plain; charset=utf-8</code>')
-    )
-    file_extension = models.CharField(
-        verbose_name=_('file extension'),
-        max_length=15,
-        blank=True,
-        help_text=_('Extension to append to the rendered filename')
-    )
-    as_attachment = models.BooleanField(
-        verbose_name=_('as attachment'),
-        default=True,
-        help_text=_("Download file as attachment")
-    )
 
     clone_fields = (
-        'object_types', 'template_code', 'mime_type', 'file_extension', 'as_attachment',
+        'object_types', 'template_code', 'mime_type', 'file_name', 'file_extension', 'as_attachment',
     )
 
     class Meta:
@@ -455,37 +444,16 @@ class ExportTemplate(SyncedDataMixin, CloningMixin, ExportTemplatesMixin, Change
         self.template_code = self.data_file.data_as_string
     sync_data.alters_data = True
 
-    def render(self, queryset):
-        """
-        Render the contents of the template.
-        """
-        context = {
-            'queryset': queryset
+    def get_context(self, context=None, queryset=None):
+        _context = {
+            'queryset': queryset,
         }
-        output = render_jinja2(self.template_code, context)
 
-        # Replace CRLF-style line terminators
-        output = output.replace('\r\n', '\n')
+        # Apply the provided context data, if any
+        if context is not None:
+            _context.update(context)
 
-        return output
-
-    def render_to_response(self, queryset):
-        """
-        Render the template to an HTTP response, delivered as a named file attachment
-        """
-        output = self.render(queryset)
-        mime_type = 'text/plain; charset=utf-8' if not self.mime_type else self.mime_type
-
-        # Build the response
-        response = HttpResponse(output, content_type=mime_type)
-
-        if self.as_attachment:
-            basename = queryset.model._meta.verbose_name_plural.replace(' ', '_')
-            extension = f'.{self.file_extension}' if self.file_extension else ''
-            filename = f'netbox_{basename}{extension}'
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-
-        return response
+        return _context
 
 
 class SavedFilter(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
@@ -493,7 +461,7 @@ class SavedFilter(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
     A set of predefined keyword parameters that can be reused to filter for specific objects.
     """
     object_types = models.ManyToManyField(
-        to='core.ObjectType',
+        to='contenttypes.ContentType',
         related_name='saved_filters',
         help_text=_('The object type(s) to which this filter applies.')
     )
@@ -568,6 +536,121 @@ class SavedFilter(CloningMixin, ExportTemplatesMixin, ChangeLoggedModel):
         return qd.urlencode()
 
 
+class TableConfig(CloningMixin, ChangeLoggedModel):
+    """
+    A saved configuration of columns and ordering which applies to a specific table.
+    """
+    object_type = models.ForeignKey(
+        to='contenttypes.ContentType',
+        on_delete=models.CASCADE,
+        related_name='table_configs',
+        help_text=_("The table's object type"),
+    )
+    table = models.CharField(
+        verbose_name=_('table'),
+        max_length=100,
+    )
+    name = models.CharField(
+        verbose_name=_('name'),
+        max_length=100,
+    )
+    description = models.CharField(
+        verbose_name=_('description'),
+        max_length=200,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    weight = models.PositiveSmallIntegerField(
+        verbose_name=_('weight'),
+        default=1000,
+    )
+    enabled = models.BooleanField(
+        verbose_name=_('enabled'),
+        default=True
+    )
+    shared = models.BooleanField(
+        verbose_name=_('shared'),
+        default=True
+    )
+    columns = ArrayField(
+        base_field=models.CharField(max_length=100),
+    )
+    ordering = ArrayField(
+        base_field=models.CharField(max_length=100),
+        blank=True,
+        null=True,
+    )
+
+    clone_fields = ('object_type', 'table', 'enabled', 'shared', 'columns', 'ordering')
+
+    class Meta:
+        ordering = ('weight', 'name')
+        verbose_name = _('table config')
+        verbose_name_plural = _('table configs')
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('extras:tableconfig', args=[self.pk])
+
+    @property
+    def docs_url(self):
+        return f'{settings.STATIC_URL}docs/models/extras/tableconfig/'
+
+    @property
+    def table_class(self):
+        return get_table_for_model(self.object_type.model_class(), name=self.table)
+
+    @property
+    def ordering_items(self):
+        """
+        Return a list of two-tuples indicating the column(s) by which the table is to be ordered and a boolean for each
+        column indicating whether its ordering is ascending.
+        """
+        items = []
+        for col in self.ordering or []:
+            if col.startswith('-'):
+                ascending = False
+                col = col[1:]
+            else:
+                ascending = True
+            items.append((col, ascending))
+        return items
+
+    def clean(self):
+        super().clean()
+
+        # Validate table
+        if self.table_class is None:
+            raise ValidationError({
+                'table': _("Unknown table: {name}").format(name=self.table)
+            })
+
+        table = self.table_class([])
+
+        # Validate ordering columns
+        for name in self.ordering:
+            if name.startswith('-'):
+                name = name[1:]  # Strip leading hyphen
+            if name not in table.columns:
+                raise ValidationError({
+                    'ordering': _('Unknown column: {name}').format(name=name)
+                })
+
+        # Validate selected columns
+        for name in self.columns:
+            if name not in table.columns:
+                raise ValidationError({
+                    'columns': _('Unknown column: {name}').format(name=name)
+                })
+
+
 class ImageAttachment(ChangeLoggedModel):
     """
     An uploaded image which is associated with an object.
@@ -597,6 +680,11 @@ class ImageAttachment(ChangeLoggedModel):
         max_length=50,
         blank=True
     )
+    description = models.CharField(
+        verbose_name=_('description'),
+        max_length=200,
+        blank=True
+    )
 
     objects = RestrictedQuerySet.as_manager()
 
@@ -611,16 +699,16 @@ class ImageAttachment(ChangeLoggedModel):
         verbose_name_plural = _('image attachments')
 
     def __str__(self):
-        if self.name:
-            return self.name
-        filename = self.image.name.rsplit('/', 1)[-1]
-        return filename.split('_', 2)[2]
+        return self.name or self.filename
+
+    def get_absolute_url(self):
+        return reverse('extras:imageattachment', args=[self.pk])
 
     def clean(self):
         super().clean()
 
         # Validate the assigned object type
-        if self.object_type not in ObjectType.objects.with_feature('image_attachments'):
+        if not has_feature(self.object_type, 'image_attachments'):
             raise ValidationError(
                 _("Image attachments cannot be assigned to this object type ({type}).").format(type=self.object_type)
             )
@@ -637,6 +725,24 @@ class ImageAttachment(ChangeLoggedModel):
         # Deleting the file erases its name. We restore the image's filename here in case we still need to reference it
         # before the request finishes. (For example, to display a message indicating the ImageAttachment was deleted.)
         self.image.name = _name
+
+    @property
+    def filename(self):
+        base_name = Path(self.image.name).name
+        prefix = f"{self.object_type.model}_{self.object_id}_"
+        return base_name.removeprefix(prefix)
+
+    @property
+    def html_tag(self):
+        """
+        Returns a complete <img> tag suitable for embedding in an HTML document.
+        """
+        return mark_safe('<img src="{url}" height="{height}" width="{width}" alt="{alt_text}" />'.format(
+            url=self.image.url,
+            height=self.image_height,
+            width=self.image_width,
+            alt_text=escape(self.description or self.name),
+        ))
 
     @property
     def size(self):
@@ -716,7 +822,7 @@ class JournalEntry(CustomFieldsMixin, CustomLinksMixin, TagsMixin, ExportTemplat
         super().clean()
 
         # Validate the assigned object type
-        if self.assigned_object_type not in ObjectType.objects.with_feature('journaling'):
+        if not has_feature(self.assigned_object_type, 'journaling'):
             raise ValidationError(
                 _("Journaling is not supported for this object type ({type}).").format(type=self.assigned_object_type)
             )
@@ -768,11 +874,14 @@ class Bookmark(models.Model):
             return str(self.object)
         return super().__str__()
 
+    def get_absolute_url(self):
+        return reverse('account:bookmarks')
+
     def clean(self):
         super().clean()
 
         # Validate the assigned object type
-        if self.object_type not in ObjectType.objects.with_feature('bookmarks'):
+        if not has_feature(self.object_type, 'bookmarks'):
             raise ValidationError(
                 _("Bookmarks cannot be assigned to this object type ({type}).").format(type=self.object_type)
             )

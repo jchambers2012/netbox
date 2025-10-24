@@ -383,7 +383,8 @@ class DeviceTestCase(TestCase):
             DeviceRole(name='Test Role 1', slug='test-role-1'),
             DeviceRole(name='Test Role 2', slug='test-role-2'),
         )
-        DeviceRole.objects.bulk_create(roles)
+        for role in roles:
+            role.save()
 
         # Create a CustomField with a default value & assign it to all component models
         cf1 = CustomField.objects.create(name='cf1', default='foo')
@@ -502,7 +503,8 @@ class DeviceTestCase(TestCase):
             device=device,
             name='Power Outlet 1',
             power_port=powerport,
-            feed_leg=PowerOutletFeedLegChoices.FEED_LEG_A
+            feed_leg=PowerOutletFeedLegChoices.FEED_LEG_A,
+            status=PowerOutletStatusChoices.STATUS_ENABLED,
         )
         self.assertEqual(poweroutlet.cf['cf1'], 'foo')
 
@@ -949,6 +951,19 @@ class CableTestCase(TestCase):
 
         wireless_interface = Interface(device=device1, name="W1", type=InterfaceTypeChoices.TYPE_80211A)
         cable = Cable(a_terminations=[interface2], b_terminations=[wireless_interface])
+        with self.assertRaises(ValidationError):
+            cable.clean()
+
+    @tag('regression')
+    def test_cable_cannot_terminate_to_a_cellular_interface(self):
+        """
+        A cable cannot terminate to a cellular interface
+        """
+        device1 = Device.objects.get(name='TestDevice1')
+        interface2 = Interface.objects.get(device__name='TestDevice2', name='eth0')
+
+        cellular_interface = Interface(device=device1, name="W1", type=InterfaceTypeChoices.TYPE_LTE)
+        cable = Cable(a_terminations=[interface2], b_terminations=[cellular_interface])
         with self.assertRaises(ValidationError):
             cable.clean()
 

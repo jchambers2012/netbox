@@ -1,6 +1,6 @@
 from ipam.tables import RouteTargetTable
+from netbox.object_actions import AddObject, BulkDelete, BulkEdit, BulkExport, BulkImport
 from netbox.views import generic
-from tenancy.views import ObjectContactsView
 from utilities.query import count_related
 from utilities.views import GetRelatedModelsMixin, register_model_view
 from . import filtersets, forms, tables
@@ -43,7 +43,7 @@ class TunnelGroupDeleteView(generic.ObjectDeleteView):
     queryset = TunnelGroup.objects.all()
 
 
-@register_model_view(TunnelGroup, 'bulk_import', detail=False)
+@register_model_view(TunnelGroup, 'bulk_import', path='import', detail=False)
 class TunnelGroupBulkImportView(generic.BulkImportView):
     queryset = TunnelGroup.objects.all()
     model_form = forms.TunnelGroupImportForm
@@ -59,6 +59,11 @@ class TunnelGroupBulkEditView(generic.BulkEditView):
     form = forms.TunnelGroupBulkEditForm
 
 
+@register_model_view(TunnelGroup, 'bulk_rename', path='rename', detail=False)
+class TunnelGroupBulkRenameView(generic.BulkRenameView):
+    queryset = TunnelGroup.objects.all()
+
+
 @register_model_view(TunnelGroup, 'bulk_delete', path='delete', detail=False)
 class TunnelGroupBulkDeleteView(generic.BulkDeleteView):
     queryset = TunnelGroup.objects.annotate(
@@ -66,11 +71,6 @@ class TunnelGroupBulkDeleteView(generic.BulkDeleteView):
     )
     filterset = filtersets.TunnelGroupFilterSet
     table = tables.TunnelGroupTable
-
-
-@register_model_view(TunnelGroup, 'contacts')
-class TunnelGroupContactsView(ObjectContactsView):
-    queryset = TunnelGroup.objects.all()
 
 
 #
@@ -112,7 +112,7 @@ class TunnelDeleteView(generic.ObjectDeleteView):
     queryset = Tunnel.objects.all()
 
 
-@register_model_view(Tunnel, 'bulk_import', detail=False)
+@register_model_view(Tunnel, 'bulk_import', path='import', detail=False)
 class TunnelBulkImportView(generic.BulkImportView):
     queryset = Tunnel.objects.all()
     model_form = forms.TunnelImportForm
@@ -128,6 +128,11 @@ class TunnelBulkEditView(generic.BulkEditView):
     form = forms.TunnelBulkEditForm
 
 
+@register_model_view(Tunnel, 'bulk_rename', path='rename', detail=False)
+class TunnelBulkRenameView(generic.BulkRenameView):
+    queryset = Tunnel.objects.all()
+
+
 @register_model_view(Tunnel, 'bulk_delete', path='delete', detail=False)
 class TunnelBulkDeleteView(generic.BulkDeleteView):
     queryset = Tunnel.objects.annotate(
@@ -135,11 +140,6 @@ class TunnelBulkDeleteView(generic.BulkDeleteView):
     )
     filterset = filtersets.TunnelFilterSet
     table = tables.TunnelTable
-
-
-@register_model_view(Tunnel, 'contacts')
-class TunnelContactsView(ObjectContactsView):
-    queryset = Tunnel.objects.all()
 
 
 #
@@ -171,7 +171,7 @@ class TunnelTerminationDeleteView(generic.ObjectDeleteView):
     queryset = TunnelTermination.objects.all()
 
 
-@register_model_view(TunnelTermination, 'bulk_import', detail=False)
+@register_model_view(TunnelTermination, 'bulk_import', path='import', detail=False)
 class TunnelTerminationBulkImportView(generic.BulkImportView):
     queryset = TunnelTermination.objects.all()
     model_form = forms.TunnelTerminationImportForm
@@ -221,7 +221,7 @@ class IKEProposalDeleteView(generic.ObjectDeleteView):
     queryset = IKEProposal.objects.all()
 
 
-@register_model_view(IKEProposal, 'bulk_import', detail=False)
+@register_model_view(IKEProposal, 'bulk_import', path='import', detail=False)
 class IKEProposalBulkImportView(generic.BulkImportView):
     queryset = IKEProposal.objects.all()
     model_form = forms.IKEProposalImportForm
@@ -233,6 +233,11 @@ class IKEProposalBulkEditView(generic.BulkEditView):
     filterset = filtersets.IKEProposalFilterSet
     table = tables.IKEProposalTable
     form = forms.IKEProposalBulkEditForm
+
+
+@register_model_view(IKEProposal, 'bulk_rename', path='rename', detail=False)
+class IKEProposalBulkRenameView(generic.BulkRenameView):
+    queryset = IKEProposal.objects.all()
 
 
 @register_model_view(IKEProposal, 'bulk_delete', path='delete', detail=False)
@@ -271,7 +276,7 @@ class IKEPolicyDeleteView(generic.ObjectDeleteView):
     queryset = IKEPolicy.objects.all()
 
 
-@register_model_view(IKEPolicy, 'bulk_import', detail=False)
+@register_model_view(IKEPolicy, 'bulk_import', path='import', detail=False)
 class IKEPolicyBulkImportView(generic.BulkImportView):
     queryset = IKEPolicy.objects.all()
     model_form = forms.IKEPolicyImportForm
@@ -283,6 +288,11 @@ class IKEPolicyBulkEditView(generic.BulkEditView):
     filterset = filtersets.IKEPolicyFilterSet
     table = tables.IKEPolicyTable
     form = forms.IKEPolicyBulkEditForm
+
+
+@register_model_view(IKEPolicy, 'bulk_rename', path='rename', detail=False)
+class IKEPolicyBulkRenameView(generic.BulkRenameView):
+    queryset = IKEPolicy.objects.all()
 
 
 @register_model_view(IKEPolicy, 'bulk_delete', path='delete', detail=False)
@@ -321,7 +331,7 @@ class IPSecProposalDeleteView(generic.ObjectDeleteView):
     queryset = IPSecProposal.objects.all()
 
 
-@register_model_view(IPSecProposal, 'bulk_import', detail=False)
+@register_model_view(IPSecProposal, 'bulk_import', path='import', detail=False)
 class IPSecProposalBulkImportView(generic.BulkImportView):
     queryset = IPSecProposal.objects.all()
     model_form = forms.IPSecProposalImportForm
@@ -333,6 +343,11 @@ class IPSecProposalBulkEditView(generic.BulkEditView):
     filterset = filtersets.IPSecProposalFilterSet
     table = tables.IPSecProposalTable
     form = forms.IPSecProposalBulkEditForm
+
+
+@register_model_view(IPSecProposal, 'bulk_rename', path='rename', detail=False)
+class IPSecProposalBulkRenameView(generic.BulkRenameView):
+    queryset = IPSecProposal.objects.all()
 
 
 @register_model_view(IPSecProposal, 'bulk_delete', path='delete', detail=False)
@@ -371,7 +386,7 @@ class IPSecPolicyDeleteView(generic.ObjectDeleteView):
     queryset = IPSecPolicy.objects.all()
 
 
-@register_model_view(IPSecPolicy, 'bulk_import', detail=False)
+@register_model_view(IPSecPolicy, 'bulk_import', path='import', detail=False)
 class IPSecPolicyBulkImportView(generic.BulkImportView):
     queryset = IPSecPolicy.objects.all()
     model_form = forms.IPSecPolicyImportForm
@@ -383,6 +398,11 @@ class IPSecPolicyBulkEditView(generic.BulkEditView):
     filterset = filtersets.IPSecPolicyFilterSet
     table = tables.IPSecPolicyTable
     form = forms.IPSecPolicyBulkEditForm
+
+
+@register_model_view(IPSecPolicy, 'bulk_rename', path='rename', detail=False)
+class IPSecPolicyBulkRenameView(generic.BulkRenameView):
+    queryset = IPSecPolicy.objects.all()
 
 
 @register_model_view(IPSecPolicy, 'bulk_delete', path='delete', detail=False)
@@ -421,7 +441,7 @@ class IPSecProfileDeleteView(generic.ObjectDeleteView):
     queryset = IPSecProfile.objects.all()
 
 
-@register_model_view(IPSecProfile, 'bulk_import', detail=False)
+@register_model_view(IPSecProfile, 'bulk_import', path='import', detail=False)
 class IPSecProfileBulkImportView(generic.BulkImportView):
     queryset = IPSecProfile.objects.all()
     model_form = forms.IPSecProfileImportForm
@@ -433,6 +453,11 @@ class IPSecProfileBulkEditView(generic.BulkEditView):
     filterset = filtersets.IPSecProfileFilterSet
     table = tables.IPSecProfileTable
     form = forms.IPSecProfileBulkEditForm
+
+
+@register_model_view(IPSecProfile, 'bulk_rename', path='rename', detail=False)
+class IPSecProfileBulkRenameView(generic.BulkRenameView):
+    queryset = IPSecProfile.objects.all()
 
 
 @register_model_view(IPSecProfile, 'bulk_delete', path='delete', detail=False)
@@ -463,10 +488,12 @@ class L2VPNView(generic.ObjectView):
             instance.import_targets.prefetch_related('tenant'),
             orderable=False
         )
+        import_targets_table.configure(request)
         export_targets_table = RouteTargetTable(
             instance.export_targets.prefetch_related('tenant'),
             orderable=False
         )
+        export_targets_table.configure(request)
 
         return {
             'import_targets_table': import_targets_table,
@@ -486,7 +513,7 @@ class L2VPNDeleteView(generic.ObjectDeleteView):
     queryset = L2VPN.objects.all()
 
 
-@register_model_view(L2VPN, 'bulk_import', detail=False)
+@register_model_view(L2VPN, 'bulk_import', path='import', detail=False)
 class L2VPNBulkImportView(generic.BulkImportView):
     queryset = L2VPN.objects.all()
     model_form = forms.L2VPNImportForm
@@ -500,16 +527,16 @@ class L2VPNBulkEditView(generic.BulkEditView):
     form = forms.L2VPNBulkEditForm
 
 
+@register_model_view(L2VPN, 'bulk_rename', path='rename', detail=False)
+class L2VPNBulkRenameView(generic.BulkRenameView):
+    queryset = L2VPN.objects.all()
+
+
 @register_model_view(L2VPN, 'bulk_delete', path='delete', detail=False)
 class L2VPNBulkDeleteView(generic.BulkDeleteView):
     queryset = L2VPN.objects.all()
     filterset = filtersets.L2VPNFilterSet
     table = tables.L2VPNTable
-
-
-@register_model_view(L2VPN, 'contacts')
-class L2VPNContactsView(ObjectContactsView):
-    queryset = L2VPN.objects.all()
 
 
 #
@@ -522,6 +549,7 @@ class L2VPNTerminationListView(generic.ObjectListView):
     table = tables.L2VPNTerminationTable
     filterset = filtersets.L2VPNTerminationFilterSet
     filterset_form = forms.L2VPNTerminationFilterForm
+    actions = (AddObject, BulkImport, BulkExport, BulkEdit, BulkDelete)
 
 
 @register_model_view(L2VPNTermination)
@@ -541,7 +569,7 @@ class L2VPNTerminationDeleteView(generic.ObjectDeleteView):
     queryset = L2VPNTermination.objects.all()
 
 
-@register_model_view(L2VPNTermination, 'bulk_import', detail=False)
+@register_model_view(L2VPNTermination, 'bulk_import', path='import', detail=False)
 class L2VPNTerminationBulkImportView(generic.BulkImportView):
     queryset = L2VPNTermination.objects.all()
     model_form = forms.L2VPNTerminationImportForm

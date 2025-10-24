@@ -4,9 +4,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from core.models import ObjectType
 from netbox.models import ChangeLoggedModel, NestedGroupModel, OrganizationalModel, PrimaryModel
-from netbox.models.features import CustomFieldsMixin, ExportTemplatesMixin, TagsMixin
+from netbox.models.features import CustomFieldsMixin, ExportTemplatesMixin, TagsMixin, has_feature
 from tenancy.choices import *
 
 __all__ = (
@@ -47,12 +46,11 @@ class Contact(PrimaryModel):
     """
     Contact information for a particular object(s) in NetBox.
     """
-    group = models.ForeignKey(
+    groups = models.ManyToManyField(
         to='tenancy.ContactGroup',
-        on_delete=models.SET_NULL,
         related_name='contacts',
-        blank=True,
-        null=True
+        related_query_name='contact',
+        blank=True
     )
     name = models.CharField(
         verbose_name=_('name'),
@@ -84,17 +82,11 @@ class Contact(PrimaryModel):
     )
 
     clone_fields = (
-        'group', 'name', 'title', 'phone', 'email', 'address', 'link',
+        'groups', 'name', 'title', 'phone', 'email', 'address', 'link',
     )
 
     class Meta:
         ordering = ['name']
-        constraints = (
-            models.UniqueConstraint(
-                fields=('group', 'name'),
-                name='%(app_label)s_%(class)s_unique_group_name'
-            ),
-        )
         verbose_name = _('contact')
         verbose_name_plural = _('contacts')
 
@@ -158,7 +150,7 @@ class ContactAssignment(CustomFieldsMixin, ExportTemplatesMixin, TagsMixin, Chan
         super().clean()
 
         # Validate the assigned object type
-        if self.object_type not in ObjectType.objects.with_feature('contacts'):
+        if not has_feature(self.object_type, 'contacts'):
             raise ValidationError(
                 _("Contacts cannot be assigned to this object type ({type}).").format(type=self.object_type)
             )

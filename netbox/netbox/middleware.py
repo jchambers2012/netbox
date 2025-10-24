@@ -1,5 +1,3 @@
-from contextlib import ExitStack
-
 import logging
 import uuid
 
@@ -10,16 +8,20 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, ProgrammingError
 from django.db.utils import InternalError
 from django.http import Http404, HttpResponseRedirect
+from django_prometheus import middleware
 
 from netbox.config import clear_config, get_config
-from netbox.registry import registry
+from netbox.metrics import Metrics
 from netbox.views import handler_500
-from utilities.api import is_api_request
+from utilities.api import is_api_request, is_graphql_request
 from utilities.error_handlers import handle_rest_api_exception
+from utilities.request import apply_request_processors
 
 __all__ = (
     'CoreMiddleware',
     'MaintenanceModeMiddleware',
+    'PrometheusAfterMiddleware',
+    'PrometheusBeforeMiddleware',
     'RemoteUserMiddleware',
 )
 
@@ -35,15 +37,18 @@ class CoreMiddleware:
         request.id = uuid.uuid4()
 
         # Apply all registered request processors
-        with ExitStack() as stack:
-            for request_processor in registry['request_processors']:
-                stack.enter_context(request_processor(request))
+        with apply_request_processors(request):
             response = self.get_response(request)
 
         # Check if language cookie should be renewed
         if request.user.is_authenticated and settings.SESSION_SAVE_EVERY_REQUEST:
             if language := request.user.config.get('locale.language'):
-                response.set_cookie(settings.LANGUAGE_COOKIE_NAME, language, max_age=request.session.get_expiry_age())
+                response.set_cookie(
+                    key=settings.LANGUAGE_COOKIE_NAME,
+                    value=language,
+                    max_age=request.session.get_expiry_age(),
+                    secure=settings.SESSION_COOKIE_SECURE,
+                )
 
         # Attach the unique request ID as an HTTP header.
         response['X-Request-ID'] = request.id
@@ -94,18 +99,23 @@ class RemoteUserMiddleware(RemoteUserMiddleware_):
     """
     Custom implementation of Django's RemoteUserMiddleware which allows for a user-configurable HTTP header name.
     """
+    async_capable = False
     force_logout_if_no_header = False
+
+    def __init__(self, get_response):
+        if get_response is None:
+            raise ValueError("get_response must be provided.")
+        self.get_response = get_response
 
     @property
     def header(self):
         return settings.REMOTE_AUTH_HEADER
 
-    def process_request(self, request):
-        logger = logging.getLogger(
-            'netbox.authentication.RemoteUserMiddleware')
+    def __call__(self, request):
+        logger = logging.getLogger('netbox.authentication.RemoteUserMiddleware')
         # Bypass middleware if remote authentication is not enabled
         if not settings.REMOTE_AUTH_ENABLED:
-            return
+            return self.get_response(request)
         # AuthenticationMiddleware is required so that request.user exists.
         if not hasattr(request, 'user'):
             raise ImproperlyConfigured(
@@ -122,13 +132,13 @@ class RemoteUserMiddleware(RemoteUserMiddleware_):
             # AnonymousUser by the AuthenticationMiddleware).
             if self.force_logout_if_no_header and request.user.is_authenticated:
                 self._remove_invalid_user(request)
-            return
+            return self.get_response(request)
         # If the user is already authenticated and that user is the user we are
         # getting passed in the headers, then the correct user is already
         # persisted in the session and we don't need to continue.
         if request.user.is_authenticated:
             if request.user.get_username() == self.clean_username(username, request):
-                return
+                return self.get_response(request)
             else:
                 # An authenticated user is associated with the request, but
                 # it does not match the authorized user in the header.
@@ -158,6 +168,8 @@ class RemoteUserMiddleware(RemoteUserMiddleware_):
             request.user = user
             auth.login(request, user)
 
+        return self.get_response(request)
+
     def _get_groups(self, request):
         logger = logging.getLogger(
             'netbox.authentication.RemoteUserMiddleware')
@@ -170,6 +182,30 @@ class RemoteUserMiddleware(RemoteUserMiddleware_):
             groups = []
         logger.debug(f"Groups are {groups}")
         return groups
+
+
+class PrometheusBeforeMiddleware(middleware.PrometheusBeforeMiddleware):
+    metrics_cls = Metrics
+
+
+class PrometheusAfterMiddleware(middleware.PrometheusAfterMiddleware):
+    metrics_cls = Metrics
+
+    def process_response(self, request, response):
+        response = super().process_response(request, response)
+
+        # Increment REST API request counters
+        if is_api_request(request):
+            method = self._method(request)
+            name = self._get_view_name(request)
+            self.label_metric(self.metrics.rest_api_requests, request, method=method).inc()
+            self.label_metric(self.metrics.rest_api_requests_by_view_method, request, method=method, view=name).inc()
+
+        # Increment GraphQL API request counters
+        elif is_graphql_request(request):
+            self.metrics.graphql_api_requests.inc()
+
+        return response
 
 
 class MaintenanceModeMiddleware:

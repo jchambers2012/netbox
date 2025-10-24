@@ -1,10 +1,35 @@
 # Error Reporting Settings
 
+## SENTRY_CONFIG
+
+A dictionary mapping keyword arguments to values, to be passed to `sentry_sdk.init()`. See the [Sentry Python SDK documentation](https://docs.sentry.io/platforms/python/) for more information on supported parameters.
+
+The default configuration is shown below:
+
+```python
+{
+    "sample_rate": 1.0,
+    "send_default_pii": False,
+    "traces_sample_rate": 0,
+}
+```
+
+Additionally, `http_proxy` and `https_proxy` are set to the HTTP and HTTPS proxies, respectively, configured for NetBox (if any).
+
 ## SENTRY_DSN
 
-Default: None
+!!! warning "This parameter will be removed in NetBox v4.5."
+    Set this using `SENTRY_CONFIG` instead:
 
-Defines a Sentry data source name (DSN) for automated error reporting. `SENTRY_ENABLED` must be True for this parameter to take effect. For example:
+    ```
+    SENTRY_CONFIG = {
+        "dsn": "https://examplePublicKey@o0.ingest.sentry.io/0",
+    }
+    ```
+
+Default: `None`
+
+Defines a Sentry data source name (DSN) for automated error reporting. `SENTRY_ENABLED` must be `True` for this parameter to take effect. For example:
 
 ```
 SENTRY_DSN = "https://examplePublicKey@o0.ingest.sentry.io/0"
@@ -14,9 +39,9 @@ SENTRY_DSN = "https://examplePublicKey@o0.ingest.sentry.io/0"
 
 ## SENTRY_ENABLED
 
-Default: False
+Default: `False`
 
-Set to True to enable automatic error reporting via [Sentry](https://sentry.io/).
+Set to `True` to enable automatic error reporting via [Sentry](https://sentry.io/).
 
 !!! note
     The `sentry-sdk` Python package is required to enable Sentry integration.
@@ -25,7 +50,16 @@ Set to True to enable automatic error reporting via [Sentry](https://sentry.io/)
 
 ## SENTRY_SAMPLE_RATE
 
-Default: 1.0 (all)
+!!! warning "This parameter will be removed in NetBox v4.5."
+    Set this using `SENTRY_CONFIG` instead:
+
+    ```
+    SENTRY_CONFIG = {
+        "sample_rate": 0.2,
+    }
+    ```
+
+Default: `1.0` (all)
 
 The sampling rate for errors. Must be a value between 0 (disabled) and 1.0 (report on all errors).
 
@@ -33,7 +67,16 @@ The sampling rate for errors. Must be a value between 0 (disabled) and 1.0 (repo
 
 ## SENTRY_SEND_DEFAULT_PII
 
-Default: False
+!!! warning "This parameter will be removed in NetBox v4.5."
+    Set this using `SENTRY_CONFIG` instead:
+
+    ```
+    SENTRY_CONFIG = {
+        "send_default_pii": True,
+    }
+    ```
+
+Default: `False`
 
 Maps to the Sentry SDK's [`send_default_pii`](https://docs.sentry.io/platforms/python/configuration/options/#send-default-pii) parameter. If enabled, certain personally identifiable information (PII) is added.
 
@@ -60,7 +103,16 @@ SENTRY_TAGS = {
 
 ## SENTRY_TRACES_SAMPLE_RATE
 
-Default: 0 (disabled)
+!!! warning "This parameter will be removed in NetBox v4.5."
+    Set this using `SENTRY_CONFIG` instead:
+
+    ```
+    SENTRY_CONFIG = {
+        "traces_sample_rate": 0.2,
+    }
+    ```
+
+Default: `0` (disabled)
 
 The sampling rate for transactions. Must be a value between 0 (disabled) and 1.0 (report on all transactions).
 
