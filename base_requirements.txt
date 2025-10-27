@@ -125,6 +125,13 @@ nh3
 # https://pillow.readthedocs.io/en/stable/releasenotes/
 Pillow
 
+# PyJWT is used for GitHub JWT Data Backend
+# https://github.com/jpadilla/pyjwt
+# Also used by djangorestframework-simplejwt and could be looked at for posable future REST API JWT support
+# https://www.django-rest-framework.org/api-guide/authentication/#json-web-token-authentication
+# https://github.com/jazzband/djangorestframework-simplejwt/blob/master/setup.py#L69
+PyJWT
+
 # PostgreSQL database adapter for Python
 # https://github.com/psycopg/psycopg/blob/master/docs/news.rst
 psycopg[c,pool]

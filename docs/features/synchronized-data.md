@@ -4,7 +4,8 @@ Several models in NetBox support the automatic synchronization of local data fro
 
 To enable remote data synchronization, the NetBox administrator first designates one or more remote data sources. NetBox currently supports the following source types:
 
-* Git repository
+* Git repository (Username/Password or Personal Access Tokens)
+* [GitHub JWT Application](./synchronized-data-GitHubJWT.md)
 * Amazon S3 bucket (or compatible product)
 * Local disk path
 
