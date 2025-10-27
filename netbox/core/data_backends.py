@@ -78,7 +78,7 @@ class GitBase(DataBackend):
             "errstream": porcelain.NoneStream(),
         }
 
-        # check if using socks for proxy - if so need to use custom pool_manager
+        # Check if using SOCKS for proxy - if so, need to use custom pool_manager
         if self.socks_proxy:
             clone_args['pool_manager'] = ProxyPoolManager(self.socks_proxy)
 
@@ -106,7 +106,7 @@ class GitBase(DataBackend):
         local_path.cleanup()
 
     def _build_auth(self):
-        """ Not Implemented in base class """
+        """Not implemented in base class."""
         return None, None
 
 
@@ -154,12 +154,12 @@ class GitHubJWTBackend(GitBase):
         'access_token_url': forms.CharField(
             required=False,
             label=_('Access Token API URL'),
-            # Guthub Cloud/EMU
+            # GitHub Cloud/EMU
             initial='https://api.github.com/app/installations/{INSTALLATION ID HERE}/access_tokens',
             # GitHub Enterprise Server
             # initial='https://{hostname}/api/v3/app/installations/{INSTALLATION ID HERE}/access_tokens',
             widget=forms.TextInput(attrs={'class': 'form-control'}),
-            help_text=_("The URL for access token API."),
+            help_text=_("The URL for the access token API."),
         ),
         'app_id': forms.CharField(
             required=False,
@@ -186,7 +186,7 @@ class GitHubJWTBackend(GitBase):
         try:
             encoded_jwt = jwt.encode(payload, self.params.get('jwt_private_key'), algorithm="RS256")
         except Exception as e:
-            raise SyncError(_("Processing or Encoding GitHub JWT token failed: {error}").format(error=e))
+            raise SyncError(_("Processing or encoding GitHub JWT token failed: {error}").format(error=e))
 
         if not isinstance(encoded_jwt, str):
             encoded_jwt = encoded_jwt.decode("utf-8")
