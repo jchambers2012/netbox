@@ -9,14 +9,14 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms import ValidationError
-from django.test import TestCase, tag
+from django.test import TestCase, override_settings, tag
 from jinja2 import DebugUndefined, StrictUndefined, TemplateError, TemplateSyntaxError, UndefinedError
 from PIL import Image
 
 from core.events import OBJECT_CREATED
 from core.models import AutoSyncRecord, DataSource, ObjectType
 from dcim.models import Device, DeviceRole, DeviceType, Location, Manufacturer, Platform, Region, Site, SiteGroup
-from extras.constants import DEFAULT_MIME_TYPE, JINJA_ENV_PARAMS_ALLOWED
+from extras.constants import DEFAULT_MIME_TYPE
 from extras.models import (
     ConfigContext,
     ConfigContextProfile,
@@ -1404,20 +1404,9 @@ class JinjaEnvironmentParamsIntegrationTestCase(TestCase):
         self.assertEqual(template.get_environment_params(), {})
 
 
+@override_settings(JINJA2_ALLOWED_EXTENSIONS=['jinja2.ext.do', 'jinja2.ext.loopcontrols'])
 class JinjaEnvironmentParamsExtensionsTestCase(TestCase):
-    """
-    Tests for Jinja2 extensions opted into via the JINJA2_ALLOWED_EXTENSIONS configuration parameter.
-    The allowlist entry is built at import time from settings, so it is patched directly here.
-    """
-    ALLOWED_EXTENSIONS = {
-        'jinja2.ext.do': 'jinja2.ext.do',
-        'jinja2.ext.loopcontrols': 'jinja2.ext.loopcontrols',
-    }
-
-    def setUp(self):
-        patcher = patch.dict(JINJA_ENV_PARAMS_ALLOWED, {'extensions': self.ALLOWED_EXTENSIONS})
-        patcher.start()
-        self.addCleanup(patcher.stop)
+    """Tests for Jinja2 extensions opted into via the JINJA2_ALLOWED_EXTENSIONS configuration parameter."""
 
     def _make_template(self, environment_params, template_code='{{ "test" }}'):
         return ConfigTemplate(
@@ -1426,14 +1415,17 @@ class JinjaEnvironmentParamsExtensionsTestCase(TestCase):
             environment_params=environment_params,
         )
 
+    @override_settings(JINJA2_ALLOWED_EXTENSIONS=[])
     def test_extensions_rejected_when_unconfigured(self):
-        # Without JINJA2_ALLOWED_EXTENSIONS, 'extensions' is not an allowlisted key at all
-        with patch.dict(JINJA_ENV_PARAMS_ALLOWED):
-            del JINJA_ENV_PARAMS_ALLOWED['extensions']
-            template = self._make_template({'extensions': ['jinja2.ext.do']})
-            with self.assertRaises(ValidationError) as cm:
-                template.clean()
-            self.assertIn('environment_params', cm.exception.message_dict)
+        template = self._make_template({'extensions': ['jinja2.ext.do']})
+        with self.assertRaises(ValidationError) as cm:
+            template.clean()
+        self.assertIn('environment_params', cm.exception.message_dict)
+
+    @override_settings(JINJA2_ALLOWED_EXTENSIONS=[])
+    def test_extensions_stripped_when_unconfigured(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do'], 'trim_blocks': True})
+        self.assertEqual(template.get_environment_params(), {'trim_blocks': True})
 
     def test_allowed_extensions_pass(self):
         template = self._make_template({'extensions': ['jinja2.ext.do', 'jinja2.ext.loopcontrols']})

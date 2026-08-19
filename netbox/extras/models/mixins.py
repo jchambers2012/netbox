@@ -4,6 +4,7 @@ import os
 import sys
 from collections import defaultdict
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import storages
 from django.db import models
@@ -79,6 +80,20 @@ class PythonModuleMixin:
         return module
 
 
+def get_allowed_environment_params():
+    """
+    Return the permitted Jinja2 environment parameters, extended with any extensions the installation
+    has opted into via JINJA2_ALLOWED_EXTENSIONS. Only these administrator-vetted dotted paths are
+    eligible for import by Jinja2; the key is omitted entirely when the setting is empty.
+    """
+    if not settings.JINJA2_ALLOWED_EXTENSIONS:
+        return JINJA_ENV_PARAMS_ALLOWED
+    return {
+        **JINJA_ENV_PARAMS_ALLOWED,
+        'extensions': {name: name for name in settings.JINJA2_ALLOWED_EXTENSIONS},
+    }
+
+
 class RenderTemplateMixin(models.Model):
     """
     Enables support for rendering templates.
@@ -139,6 +154,7 @@ class RenderTemplateMixin(models.Model):
         super().clean()
 
         params = self.environment_params or {}
+        allowed_params = get_allowed_environment_params()
         for key, value in params.items():
             # finalize is deprecated: block new use but preserve existing stored values
             if key == 'finalize':
@@ -147,13 +163,13 @@ class RenderTemplateMixin(models.Model):
                         'The "{key}" parameter is deprecated and may not be set on new or modified templates.'
                     ).format(key=key)
                 })
-            if key not in JINJA_ENV_PARAMS_ALLOWED:
+            if key not in allowed_params:
                 raise ValidationError({
                     'environment_params': _(
                         '"{key}" is not a permitted Jinja2 environment parameter.'
                     ).format(key=key)
                 })
-            allowed = JINJA_ENV_PARAMS_ALLOWED[key]
+            allowed = allowed_params[key]
             if type(allowed) is dict:
                 # A list is permitted for multi-valued params (e.g. extensions); every member must be allowlisted.
                 values = value if type(value) is list else [value]
@@ -175,9 +191,10 @@ class RenderTemplateMixin(models.Model):
         Return a copy of params with only permitted keys. Keys not in the allowlist are
         stripped, except 'finalize' which is a deprecated legacy carve-out.
         """
+        allowed_params = get_allowed_environment_params()
         return {
             key: value for key, value in params.items()
-            if key in JINJA_ENV_PARAMS_ALLOWED or key == 'finalize'
+            if key in allowed_params or key == 'finalize'
         }
 
     @staticmethod
@@ -188,8 +205,9 @@ class RenderTemplateMixin(models.Model):
         unresolved params are passed through unchanged.
         """
         resolved = {}
+        allowed_params = get_allowed_environment_params()
         for name, value in params.items():
-            allowed = JINJA_ENV_PARAMS_ALLOWED.get(name)
+            allowed = allowed_params.get(name)
             if type(allowed) is not dict:
                 resolved[name] = value
             elif type(value) is list:
