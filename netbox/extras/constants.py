@@ -71,8 +71,7 @@ JINJA_ENV_PARAMS_ALLOWED = {
     },
     # Excluded (dangerous — accept callables or trigger imports):
     #   'bytecode_cache' — accepts arbitrary object
-    #   'extensions'     — Jinja2 internally calls import_string() on string entries; permitted only
-    #                      for the paths named by JINJA2_ALLOWED_EXTENSIONS (see extras.models.mixins)
+    #   'extensions'     — Jinja2 internally calls import_string() on string entries
     #   'finalize'       — deprecated; legacy carve-out in RenderTemplateMixin
     #   'loader'         — accepts arbitrary object
 }
