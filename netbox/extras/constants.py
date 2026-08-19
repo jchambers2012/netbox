@@ -1,3 +1,4 @@
+from django.conf import settings
 from jinja2 import ChainableUndefined, DebugUndefined, StrictUndefined, Undefined
 
 from core.events import *
@@ -71,10 +72,18 @@ JINJA_ENV_PARAMS_ALLOWED = {
     },
     # Excluded (dangerous — accept callables or trigger imports):
     #   'bytecode_cache' — accepts arbitrary object
-    #   'extensions'     — Jinja2 internally calls import_string() on string entries
+    #   'extensions'     — Jinja2 internally calls import_string() on string entries; opt-in below
     #   'finalize'       — deprecated; legacy carve-out in RenderTemplateMixin
     #   'loader'         — accepts arbitrary object
 }
+
+# Jinja2 extensions may be opted into per-installation via the JINJA2_ALLOWED_EXTENSIONS configuration
+# parameter (e.g. 'jinja2.ext.do', 'jinja2.ext.loopcontrols'). Only these administrator-vetted dotted
+# paths are eligible for import by Jinja2; the key is left out of the allowlist entirely when unset.
+if settings.JINJA2_ALLOWED_EXTENSIONS:
+    JINJA_ENV_PARAMS_ALLOWED['extensions'] = {
+        name: name for name in settings.JINJA2_ALLOWED_EXTENSIONS
+    }
 
 # Dashboard
 DEFAULT_DASHBOARD = [

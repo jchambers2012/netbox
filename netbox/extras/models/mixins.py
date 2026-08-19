@@ -155,7 +155,9 @@ class RenderTemplateMixin(models.Model):
                 })
             allowed = JINJA_ENV_PARAMS_ALLOWED[key]
             if type(allowed) is dict:
-                if value not in allowed:
+                # A list is permitted for multi-valued params (e.g. extensions); every member must be allowlisted.
+                values = value if type(value) is list else [value]
+                if any(type(v) is not str or v not in allowed for v in values):
                     raise ValidationError({
                         'environment_params': _(
                             'Invalid value "{value}" for parameter "{key}". '
@@ -188,7 +190,12 @@ class RenderTemplateMixin(models.Model):
         resolved = {}
         for name, value in params.items():
             allowed = JINJA_ENV_PARAMS_ALLOWED.get(name)
-            if type(allowed) is dict and value in allowed:
+            if type(allowed) is not dict:
+                resolved[name] = value
+            elif type(value) is list:
+                # Multi-valued param: drop any member which is not allowlisted
+                resolved[name] = [allowed[v] for v in value if type(v) is str and v in allowed]
+            elif type(value) is str and value in allowed:
                 resolved[name] = allowed[value]
             else:
                 resolved[name] = value
