@@ -9,7 +9,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.forms import ValidationError
-from django.test import TestCase, tag
+from django.test import TestCase, override_settings, tag
 from jinja2 import DebugUndefined, StrictUndefined, TemplateError, TemplateSyntaxError, UndefinedError
 from PIL import Image
 
@@ -1402,3 +1402,94 @@ class JinjaEnvironmentParamsIntegrationTestCase(TestCase):
     def test_empty_environment_params(self):
         template = self._make_template({})
         self.assertEqual(template.get_environment_params(), {})
+
+
+@override_settings(JINJA2_ALLOWED_EXTENSIONS=['jinja2.ext.do', 'jinja2.ext.loopcontrols'])
+class JinjaEnvironmentParamsExtensionsTestCase(TestCase):
+    """Tests for Jinja2 extensions opted into via the JINJA2_ALLOWED_EXTENSIONS configuration parameter."""
+
+    def _make_template(self, environment_params, template_code='{{ "test" }}'):
+        return ConfigTemplate(
+            name='test',
+            template_code=template_code,
+            environment_params=environment_params,
+        )
+
+    @override_settings(JINJA2_ALLOWED_EXTENSIONS=[])
+    def test_extensions_rejected_when_unconfigured(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do']})
+        with self.assertRaises(ValidationError) as cm:
+            template.clean()
+        self.assertIn('environment_params', cm.exception.message_dict)
+
+    @override_settings(JINJA2_ALLOWED_EXTENSIONS=[])
+    def test_extensions_stripped_when_unconfigured(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do'], 'trim_blocks': True})
+        self.assertEqual(template.get_environment_params(), {'trim_blocks': True})
+
+    def test_allowed_extensions_pass(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do', 'jinja2.ext.loopcontrols']})
+        template.clean()
+
+    def test_single_allowed_extension_passes(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do']})
+        template.clean()
+
+    def test_empty_extensions_list_passes(self):
+        template = self._make_template({'extensions': []})
+        template.clean()
+
+    def test_unlisted_extension_rejected(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do', 'os.system']})
+        with self.assertRaises(ValidationError) as cm:
+            template.clean()
+        self.assertIn('environment_params', cm.exception.message_dict)
+
+    def test_non_string_member_rejected(self):
+        # An unhashable member must raise ValidationError rather than TypeError
+        template = self._make_template({'extensions': [{'jinja2.ext.do': True}]})
+        with self.assertRaises(ValidationError) as cm:
+            template.clean()
+        self.assertIn('environment_params', cm.exception.message_dict)
+
+    def test_unhashable_value_for_mapped_param_rejected(self):
+        # Regression: a list value for a single-valued mapped param must not raise TypeError
+        template = self._make_template({'undefined': ['jinja2.StrictUndefined', 'os.system']})
+        with self.assertRaises(ValidationError) as cm:
+            template.clean()
+        self.assertIn('environment_params', cm.exception.message_dict)
+
+    def test_get_environment_params_preserves_allowed_extensions(self):
+        template = self._make_template({'extensions': ['jinja2.ext.do', 'jinja2.ext.loopcontrols']})
+        self.assertEqual(
+            template.get_environment_params()['extensions'],
+            ['jinja2.ext.do', 'jinja2.ext.loopcontrols']
+        )
+
+    def test_get_environment_params_strips_unlisted_extensions(self):
+        # Values stored before the parameter was restricted must not be passed through to Jinja2
+        template = self._make_template({'extensions': ['jinja2.ext.do', 'os.system']})
+        self.assertEqual(template.get_environment_params()['extensions'], ['jinja2.ext.do'])
+
+    def test_render_with_do_extension(self):
+        template = self._make_template(
+            {'extensions': ['jinja2.ext.do']},
+            template_code='{% set items = [] %}{% do items.append("a") %}{% do items.append("b") %}'
+                          '{{ items|join(",") }}',
+        )
+        self.assertEqual(template.render({}), 'a,b')
+
+    def test_render_with_loopcontrols_extension(self):
+        template = self._make_template(
+            {'extensions': ['jinja2.ext.loopcontrols']},
+            template_code='{% for i in [1, 2, 3] %}{% if i == 3 %}{% break %}{% endif %}{{ i }}{% endfor %}',
+        )
+        self.assertEqual(template.render({}), '12')
+
+    def test_render_without_extension_raises(self):
+        template = self._make_template(
+            {},
+            template_code='{% set items = [] %}{% do items.append("a") %}',
+        )
+        with self.assertRaises(TemplateSyntaxError):
+            template.render({})
