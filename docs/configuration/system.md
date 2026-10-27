@@ -162,6 +162,34 @@ Set this configuration parameter to `True` for NetBox deployments which do not h
 
 ---
 
+## JINJA2_ALLOWED_EXTENSIONS
+
+Default: `[]` (empty list)
+
+This proof-of-concept parameter is not part of the upstream v4.7.3 release.
+
+A list of [Jinja extensions](https://jinja.palletsprojects.com/en/stable/extensions/) which templates are permitted to enable via their `extensions` environment parameter. Only administrator-approved dotted paths may be imported. For example:
+
+```python
+JINJA2_ALLOWED_EXTENSIONS = [
+    'jinja2.ext.do',
+    'jinja2.ext.loopcontrols',
+]
+```
+
+An export or configuration template may then opt into any subset of these, supplied as a JSON list (not a single string):
+
+```json
+{"extensions": ["jinja2.ext.do", "jinja2.ext.loopcontrols"]}
+```
+
+The empty default leaves extensions disabled. Changes require a service restart. Stored extensions which are no longer allowed are removed at render time and logged as a warning. Malformed stored values raise a validation error.
+
+!!! warning
+    Only add extensions which you trust. NetBox imports each configured dotted path when a template which references it is rendered. Invalid import paths fail at render time; paths are not imported during startup validation.
+
+---
+
 ## JINJA_ENVIRONMENT_PARAMS
 
 Default: `[]`

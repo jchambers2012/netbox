@@ -159,6 +159,9 @@ EXEMPT_VIEW_PERMISSIONS = [
 #     'https': 'http://10.10.1.10:1080',
 # }
 
+# Administrator-vetted Jinja extensions which export and configuration templates may opt into.
+# JINJA2_ALLOWED_EXTENSIONS = ['jinja2.ext.do', 'jinja2.ext.loopcontrols']
+
 # Enable custom logging. Please see the Django documentation for detailed guidance on configuring custom logs:
 #   https://docs.djangoproject.com/en/stable/topics/logging/
 LOGGING = {}
