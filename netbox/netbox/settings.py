@@ -161,6 +161,11 @@ HTTP_CLIENT_IP_HEADERS = getattr(configuration, 'HTTP_CLIENT_IP_HEADERS', (
 HTTP_PROXIES = getattr(configuration, 'HTTP_PROXIES', {})
 INTERNAL_IPS = getattr(configuration, 'INTERNAL_IPS', ('127.0.0.1', '::1'))
 ISOLATED_DEPLOYMENT = getattr(configuration, 'ISOLATED_DEPLOYMENT', False)
+JINJA2_ALLOWED_EXTENSIONS = getattr(configuration, 'JINJA2_ALLOWED_EXTENSIONS', [])
+if not isinstance(JINJA2_ALLOWED_EXTENSIONS, list) or any(
+    not isinstance(extension, str) or not extension for extension in JINJA2_ALLOWED_EXTENSIONS
+):
+    raise ImproperlyConfigured("JINJA2_ALLOWED_EXTENSIONS must be a list of non-empty dotted path strings.")
 JINJA_ENVIRONMENT_PARAMS = getattr(configuration, 'JINJA_ENVIRONMENT_PARAMS', [])
 JINJA_FILTERS = getattr(configuration, 'JINJA_FILTERS', getattr(configuration, 'JINJA2_FILTERS', {}))
 LANGUAGE_CODE = getattr(configuration, 'DEFAULT_LANGUAGE', 'en-us')
